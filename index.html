@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Code39 突合（1回目=正解 / 2回目=照合）</title>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", sans-serif; margin: 0; background:#f6f7f9; }
+    header { padding: 12px 16px; background: #111827; color: #fff; font-weight: 700; }
+    main { padding: 14px 16px 90px; max-width: 760px; margin: 0 auto; }
+    .card { background:#fff; border-radius: 14px; padding: 14px; box-shadow: 0 6px 20px rgba(0,0,0,.06); margin: 12px 0; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; }
+    button {
+      border: 0; border-radius: 12px; padding: 12px 14px; font-size: 16px; font-weight: 700;
+      background:#111827; color:#fff; cursor:pointer;
+    }
+    button.secondary { background:#374151; }
+    button.danger { background:#b91c1c; }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+    #videoWrap { overflow:hidden; border-radius: 14px; background:#000; }
+    video { width: 100%; height: auto; display:block; }
+    .kv { display:grid; grid-template-columns: 120px 1fr; gap: 10px; align-items:center; }
+    .label { color:#6b7280; font-weight: 700; }
+    .value { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 16px; word-break: break-all; }
+    .badge { display:inline-block; padding: 6px 10px; border-radius: 999px; font-weight: 800; }
+    .ok { background:#dcfce7; color:#166534; }
+    .ng { background:#fee2e2; color:#991b1b; }
+    .wait { background:#e5e7eb; color:#111827; }
+    .hint { color:#6b7280; font-size: 13px; line-height: 1.4; }
+    .big { font-size: 20px; font-weight: 900; }
+    footer {
+      position: fixed; left: 0; right: 0; bottom: 0;
+      padding: 10px 12px; background: rgba(246,247,249,.92); backdrop-filter: blur(8px);
+      border-top: 1px solid #e5e7eb;
+    }
+  </style>
+</head>
+<body>
+  <header>Code39 突合（1回目=正解 / 2回目=照合）</header>
+
+  <main>
+    <div class="card">
+      <div class="row">
+        <button id="btnStart">カメラ開始</button>
+        <button id="btnStop" class="secondary" disabled>停止</button>
+        <button id="btnReset" class="danger">リセット</button>
+      </div>
+      <p class="hint" style="margin:10px 0 0;">
+        使い方：①「正解（出庫指示側）」をスキャン → ②「現品票（実物側）」をスキャン → OK/NG表示 → 自動で次へ。<br>
+        ※ iPhoneは「設定→Safari→カメラ」を許可してください。照明不足だと誤読しやすいので明るい場所推奨です。
+      </p>
+    </div>
+
+    <div class="card" id="videoWrap">
+      <video id="video" playsinline></video>
+    </div>
+
+    <div class="card">
+      <div class="kv">
+        <div class="label">状態</div>
+        <div class="value"><span id="stateBadge" class="badge wait">待機</span></div>
+      </div>
+      <div class="kv" style="margin-top:10px;">
+        <div class="label">正解（1回目）</div>
+        <div class="value" id="expected">—</div>
+      </div>
+      <div class="kv" style="margin-top:10px;">
+        <div class="label">照合（2回目）</div>
+        <div class="value" id="actual">—</div>
+      </div>
+      <div class="kv" style="margin-top:10px;">
+        <div class="label">判定</div>
+        <div class="value big" id="result">—</div>
+      </div>
+      <p class="hint" id="lastInfo" style="margin:10px 0 0;">—</p>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <button id="btnSwap" class="secondary">カメラ切替（前/後）</button>
+        <button id="btnTorch" class="secondary">ライト（対応端末のみ）</button>
+      </div>
+      <p class="hint" style="margin:10px 0 0;">
+        ライトは端末/ブラウザ対応が必要です。効かない場合は無視してOKです。
+      </p>
+    </div>
+  </main>
+
+  <footer class="hint">
+    推奨運用：NG時は作業中断 → 保留箱 → 上長確認（その場で流さない）。
+  </footer>
+
+  <!-- ZXing (Barcode) -->
+  <script src="https://unpkg.com/@zxing/library@0.20.0"></script>
+
+  <script>
+    // ========= 設定 =========
+    const ENABLE_AUDIO = true;      // OK/NG音
+    const AUTO_CLEAR_AFTER_MS = 800; // 判定後に表示を少し残す
+    const COOLDOWN_MS = 900;        // 連続読取の誤爆防止（同じコード連発対策）
+
+    // Code39中心。必要なら formats に他も追加可。
+    const FORMATS = [
+      ZXing.BarcodeFormat.CODE_39
+    ];
+
+    // ========= 状態 =========
+    let expected = null;     // 1回目（正解）
+    let lastScanAt = 0;
+    let lastText = null;
+
+    let codeReader = null;
+    let currentDeviceId = null;
+    let devices = [];
+    let videoTrack = null;
+
+    // ========= UI =========
+    const btnStart = document.getElementById('btnStart');
+    const btnStop  = document.getElementById('btnStop');
+    const btnReset = document.getElementById('btnReset');
+    const btnSwap  = document.getElementById('btnSwap');
+    const btnTorch = document.getElementById('btnTorch');
+
+    const elExpected = document.getElementById('expected');
+    const elActual   = document.getElementById('actual');
+    const elResult   = document.getElementById('result');
+    const elBadge    = document.getElementById('stateBadge');
+    const elLastInfo = document.getElementById('lastInfo');
+    const videoEl    = document.getElementById('video');
+
+    function setBadge(type, text){
+      elBadge.className = 'badge ' + (type || 'wait');
+      elBadge.textContent = text;
+    }
+
+    function beep(freq=880, ms=120){
+      if (!ENABLE_AUDIO) return;
+      try{
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.frequency.value = freq;
+        o.type = 'sine';
+        o.connect(g); g.connect(ctx.destination);
+        g.gain.setValueAtTime(0.0001, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.01);
+        o.start();
+        setTimeout(() => {
+          g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.02);
+          o.stop(ctx.currentTime + 0.03);
+          ctx.close();
+        }, ms);
+      }catch(e){}
+    }
+
+    function resetAll(){
+      expected = null;
+      elExpected.textContent = '—';
+      elActual.textContent = '—';
+      elResult.textContent = '—';
+      setBadge('wait','待機');
+      elLastInfo.textContent = '—';
+      lastText = null;
+      lastScanAt = 0;
+    }
+
+    function normalize(text){
+      // 現場ルールに合わせて調整してください（例：空白除去、ハイフン除去、全部大文字化など）
+      // Code39は大文字運用が多いので基本は大文字化推奨
+      return String(text || '').trim().toUpperCase();
+    }
+
+    function handleScan(rawText){
+      const now = Date.now();
+      if (now - lastScanAt < COOLDOWN_MS) return;
+
+      const text = normalize(rawText);
+
+      // 同じ値の連発は無視（誤爆防止）
+      if (text && text === lastText && (now - lastScanAt) < (COOLDOWN_MS * 2)) return;
+
+      lastScanAt = now;
+      lastText = text;
+
+      if (!expected){
+        expected = text;
+        elExpected.textContent = expected;
+        elActual.textContent = '—';
+        elResult.textContent = '—';
+        setBadge('wait', '正解を読取り済み → 次に現品票をスキャン');
+        elLastInfo.textContent = `1回目（正解）を保持しました：${expected}`;
+        beep(660, 90);
+        return;
+      }
+
+      // 2回目（照合）
+      const actual = text;
+      elActual.textContent = actual;
+
+      const ok = (expected === actual);
+
+      if (ok){
+        elResult.textContent = 'OK（一致）';
+        setBadge('ok', 'OK');
+        elLastInfo.textContent = `一致：${expected}`;
+        beep(1040, 140);
+      }else{
+        elResult.textContent = 'NG（不一致）';
+        setBadge('ng', 'NG');
+        elLastInfo.textContent = `不一致：正解=${expected} / 現品=${actual}`;
+        beep(220, 220);
+        setTimeout(()=>beep(220, 220), 260);
+      }
+
+      // 次へ（自動でexpectedクリア）
+      const prevExpected = expected;
+      expected = null;
+
+      setTimeout(()=>{
+        elExpected.textContent = '—';
+        // actual/resultは少し残してからクリア
+        setTimeout(()=>{
+          elActual.textContent = '—';
+          elResult.textContent = '—';
+          setBadge('wait','待機');
+          elLastInfo.textContent = `次の品番へ（前回：${prevExpected}）`;
+        }, AUTO_CLEAR_AFTER_MS);
+      }, 10);
+    }
+
+    async function listCameras(){
+      const list = await ZXing.BrowserCodeReader.listVideoInputDevices();
+      devices = list || [];
+      // 背面っぽいカメラを優先（ラベルが取れない場合もある）
+      const back = devices.find(d => /back|rear|environment/i.test(d.label));
+      currentDeviceId = (back?.deviceId) || (devices[0]?.deviceId) || null;
+    }
+
+    async function startCamera(){
+      btnStart.disabled = true;
+      btnStop.disabled = false;
+
+      resetAll();
+
+      codeReader = new ZXing.BrowserMultiFormatReader(
+        new Map([[ZXing.DecodeHintType.POSSIBLE_FORMATS, FORMATS]])
+      );
+
+      if (!devices.length) await listCameras();
+
+      if (!currentDeviceId){
+        alert('カメラが見つかりませんでした。ブラウザのカメラ許可をご確認ください。');
+        btnStart.disabled = false;
+        btnStop.disabled = true;
+        return;
+      }
+
+      setBadge('wait','カメラ起動中…');
+
+      await codeReader.decodeFromVideoDevice(
+        currentDeviceId,
+        videoEl,
+        (result, err) => {
+          if (result?.getText){
+            setBadge('wait', expected ? '現品票をスキャン中…' : '正解（出庫指示）をスキャンしてください');
+            handleScan(result.getText());
+          }
+          // err は頻繁に出る（NotFound等）ので基本無視
+        }
+      );
+
+      // トーチ制御用に track を取得
+      try{
+        const stream = videoEl.srcObject;
+        if (stream && stream.getVideoTracks){
+          videoTrack = stream.getVideoTracks()[0] || null;
+        }
+      }catch(e){}
+
+      setBadge('wait', '正解（出庫指示）をスキャンしてください');
+    }
+
+    async function stopCamera(){
+      try{
+        if (codeReader){
+          codeReader.reset();
+          codeReader = null;
+        }
+      }catch(e){}
+      try{
+        if (videoTrack){
+          videoTrack.stop();
+          videoTrack = null;
+        }
+      }catch(e){}
+      btnStart.disabled = false;
+      btnStop.disabled = true;
+      setBadge('wait','停止');
+    }
+
+    async function swapCamera(){
+      if (!devices.length) await listCameras();
+      if (devices.length <= 1){
+        alert('切替可能なカメラが1つしかありません。');
+        return;
+      }
+      const idx = devices.findIndex(d => d.deviceId === currentDeviceId);
+      const next = devices[(idx + 1) % devices.length];
+      currentDeviceId = next.deviceId;
+
+      const running = !btnStop.disabled;
+      if (running){
+        await stopCamera();
+        await startCamera();
+      }
+    }
+
+    async function toggleTorch(){
+      if (!videoTrack){
+        alert('カメラ開始後に使用してください。');
+        return;
+      }
+      const caps = videoTrack.getCapabilities ? videoTrack.getCapabilities() : null;
+      if (!caps || !caps.torch){
+        alert('この端末/ブラウザはライト制御に対応していません。');
+        return;
+      }
+      const settings = videoTrack.getSettings ? videoTrack.getSettings() : {};
+      const torchOn = !!settings.torch;
+      try{
+        await videoTrack.applyConstraints({ advanced: [{ torch: !torchOn }] });
+      }catch(e){
+        alert('ライトの切替に失敗しました。');
+      }
+    }
+
+    // ========= イベント =========
+    btnStart.addEventListener('click', startCamera);
+    btnStop.addEventListener('click', stopCamera);
+    btnReset.addEventListener('click', resetAll);
+    btnSwap.addEventListener('click', swapCamera);
+    btnTorch.addEventListener('click', toggleTorch);
+
+    // 初期
+    resetAll();
+  </script>
+</body>
+</html>
