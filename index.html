@@ -1,175 +1,241 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Code39 突合</title>
-
-<style>
-body { font-family: system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans JP",sans-serif; margin:0; background:#f6f7f9;}
-header { padding:12px 16px; background:#111827; color:#fff; font-weight:700;}
-main { padding:14px 16px 90px; max-width:760px; margin:0 auto;}
-.card { background:#fff; border-radius:14px; padding:14px; box-shadow:0 6px 20px rgba(0,0,0,.06); margin:12px 0;}
-button{ border:0;border-radius:12px;padding:12px 14px;font-size:16px;font-weight:700;background:#111827;color:#fff;cursor:pointer;}
-button.secondary{background:#374151;}
-button.danger{background:#b91c1c;}
-button:disabled{opacity:.5;}
-video{width:100%;border-radius:14px;background:#000;}
-.badge{display:inline-block;padding:6px 10px;border-radius:999px;font-weight:800;}
-.ok{background:#dcfce7;color:#166534;}
-.ng{background:#fee2e2;color:#991b1b;}
-.wait{background:#e5e7eb;color:#111827;}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Code39 突合（1回目=正解 / 2回目=照合）</title>
+  <style>
+    body { font-family: system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans JP",sans-serif; margin:0; background:#f6f7f9; }
+    header { padding:12px 16px; background:#111827; color:#fff; font-weight:700; }
+    main { padding:14px 16px 90px; max-width:760px; margin:0 auto; }
+    .card { background:#fff; border-radius:14px; padding:14px; box-shadow:0 6px 20px rgba(0,0,0,.06); margin:12px 0; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; }
+    button{ border:0;border-radius:12px;padding:12px 14px;font-size:16px;font-weight:700;background:#111827;color:#fff;cursor:pointer;}
+    button.secondary{ background:#374151; }
+    button.danger{ background:#b91c1c; }
+    button:disabled{ opacity:.5; cursor:not-allowed; }
+    #videoWrap{ overflow:hidden; border-radius:14px; background:#000; }
+    video{ width:100%; height:auto; display:block; background:#000; }
+    .badge{ display:inline-block; padding:6px 10px; border-radius:999px; font-weight:800; }
+    .ok{ background:#dcfce7; color:#166534; }
+    .ng{ background:#fee2e2; color:#991b1b; }
+    .wait{ background:#e5e7eb; color:#111827; }
+    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; word-break:break-all; }
+    .big{ font-size:20px; font-weight:900; }
+    .hint{ color:#6b7280; font-size:13px; line-height:1.4; }
+    .log{ margin-top:10px; padding:10px; background:#111827; color:#e5e7eb; border-radius:12px; font-size:12px; white-space:pre-wrap; }
+  </style>
 </head>
-
 <body>
-
 <header>Code39 突合（1回目=正解 / 2回目=照合）</header>
 
 <main>
+  <div class="card">
+    <div class="row">
+      <button id="btnStart">カメラ開始</button>
+      <button id="btnStop" class="secondary" disabled>停止</button>
+      <button id="btnReset" class="danger">リセット</button>
+    </div>
+    <p class="hint" style="margin:10px 0 0;">
+      ①「正解」をスキャン → ②「現品票」をスキャン → OK/NG → 自動で次へ。<br>
+      ※ iPhoneは「ぁあ → Webサイトの設定 → カメラ：許可」
+    </p>
+    <div id="log" class="log">log: ready</div>
+  </div>
 
-<div class="card">
-<button id="btnStart">カメラ開始</button>
-<button id="btnStop" class="secondary" disabled>停止</button>
-<button id="btnReset" class="danger">リセット</button>
-</div>
+  <div class="card" id="videoWrap">
+    <!-- iPhone対策：muted を付けると play() が通りやすい -->
+    <video id="video" playsinline muted></video>
+  </div>
 
-<div class="card">
-<video id="video" playsinline></video>
-</div>
-
-<div class="card">
-<div>状態：<span id="stateBadge" class="badge wait">待機</span></div>
-<div>正解：<span id="expected">—</span></div>
-<div>照合：<span id="actual">—</span></div>
-<div style="font-weight:900;font-size:20px;">判定：<span id="result">—</span></div>
-</div>
-
+  <div class="card">
+    <div>状態：<span id="stateBadge" class="badge wait">待機</span></div>
+    <div style="margin-top:8px;">正解（1回目）：<span id="expected" class="mono">—</span></div>
+    <div style="margin-top:8px;">照合（2回目）：<span id="actual" class="mono">—</span></div>
+    <div style="margin-top:8px;" class="big">判定：<span id="result">—</span></div>
+  </div>
 </main>
 
-<!-- ZXing -->
+<!-- ★同梱版ZXing -->
 <script src="./zxing.js"></script>
 
 <script>
-const FORMATS=[ZXing.BarcodeFormat.CODE_39];
+  // ========= 設定 =========
+  const ENABLE_AUDIO = true;
+  const FORMATS = [ZXing.BarcodeFormat.CODE_39];
 
-let expected=null;
-let codeReader=null;
-let currentDeviceId=null;
-let devices=[];
+  // ========= 状態 =========
+  let expected = null;
+  let stream = null;
+  let reader = null;
+  let lastScanAt = 0;
+  const COOLDOWN_MS = 800;
 
-const btnStart=document.getElementById('btnStart');
-const btnStop=document.getElementById('btnStop');
-const btnReset=document.getElementById('btnReset');
-const video=document.getElementById('video');
-const elExpected=document.getElementById('expected');
-const elActual=document.getElementById('actual');
-const elResult=document.getElementById('result');
-const elBadge=document.getElementById('stateBadge');
+  // ========= UI =========
+  const btnStart = document.getElementById('btnStart');
+  const btnStop  = document.getElementById('btnStop');
+  const btnReset = document.getElementById('btnReset');
+  const videoEl  = document.getElementById('video');
 
-function setBadge(type,text){
-elBadge.className='badge '+type;
-elBadge.textContent=text;
-}
+  const elExpected = document.getElementById('expected');
+  const elActual   = document.getElementById('actual');
+  const elResult   = document.getElementById('result');
+  const elBadge    = document.getElementById('stateBadge');
+  const logEl      = document.getElementById('log');
 
-function normalize(t){
-return String(t||'').trim().toUpperCase();
-}
+  function log(msg){ logEl.textContent = "log: " + msg; }
 
-function resetAll(){
-expected=null;
-elExpected.textContent='—';
-elActual.textContent='—';
-elResult.textContent='—';
-setBadge('wait','待機');
-}
+  function setBadge(type, text){
+    elBadge.className = 'badge ' + (type || 'wait');
+    elBadge.textContent = text;
+  }
 
-async function startCamera(){
+  function beep(freq=880, ms=120){
+    if (!ENABLE_AUDIO) return;
+    try{
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.frequency.value = freq;
+      o.type = 'sine';
+      o.connect(g); g.connect(ctx.destination);
+      g.gain.setValueAtTime(0.0001, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.01);
+      o.start();
+      setTimeout(() => {
+        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.02);
+        o.stop(ctx.currentTime + 0.03);
+        ctx.close();
+      }, ms);
+    }catch(e){}
+  }
 
-if(typeof ZXing==="undefined"){
-alert("ZXingが読み込めていません。外部JSがブロックされています。");
-return;
-}
+  function normalize(text){
+    return String(text || '').trim().toUpperCase();
+  }
 
-try{
-await navigator.mediaDevices.getUserMedia({video:true});
-}catch(e){
-alert("カメラ権限エラー: "+e.name);
-return;
-}
+  function resetAll(){
+    expected = null;
+    elExpected.textContent = '—';
+    elActual.textContent = '—';
+    elResult.textContent = '—';
+    setBadge('wait','待機');
+  }
 
-codeReader=new ZXing.BrowserMultiFormatReader(
-new Map([[ZXing.DecodeHintType.POSSIBLE_FORMATS,FORMATS]])
-);
+  function handleScan(raw){
+    const now = Date.now();
+    if (now - lastScanAt < COOLDOWN_MS) return;
+    lastScanAt = now;
 
-devices=await ZXing.BrowserCodeReader.listVideoInputDevices();
+    const code = normalize(raw);
 
-if(!devices.length){
-alert("カメラが見つかりません");
-return;
-}
+    if (!expected){
+      expected = code;
+      elExpected.textContent = code;
+      elActual.textContent = '—';
+      elResult.textContent = '—';
+      setBadge('wait','正解保持 → 次に現品票');
+      beep(660, 90);
+      return;
+    }
 
-currentDeviceId=devices[0].deviceId;
+    elActual.textContent = code;
+    const ok = (expected === code);
 
-btnStart.disabled=true;
-btnStop.disabled=false;
+    if (ok){
+      elResult.textContent = 'OK（一致）';
+      setBadge('ok','OK');
+      beep(1040, 140);
+    }else{
+      elResult.textContent = 'NG（不一致）';
+      setBadge('ng','NG');
+      beep(220, 220);
+      setTimeout(()=>beep(220, 220), 260);
+    }
 
-await codeReader.decodeFromVideoDevice(
-currentDeviceId,
-video,
-(result,err)=>{
-if(result){
-handleScan(result.getText());
-}
-}
-);
+    expected = null;
+    setTimeout(resetAll, 1200);
+  }
 
-setBadge('wait','正解をスキャン');
-}
+  async function startCamera(){
+    // ZXingがいるか確認
+    if (typeof ZXing === "undefined"){
+      alert("ZXingが読み込めていません（zxing.js を確認）");
+      return;
+    }
 
-function handleScan(text){
-const code=normalize(text);
+    btnStart.disabled = true;
+    btnStop.disabled = false;
+    resetAll();
 
-if(!expected){
-expected=code;
-elExpected.textContent=code;
-setBadge('wait','次に現品票をスキャン');
-return;
-}
+    try{
+      log("getUserMedia requesting...");
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      });
 
-elActual.textContent=code;
+      // videoに確実に流す
+      videoEl.srcObject = stream;
+      await videoEl.play();
+      log("video playing. starting decoder...");
 
-if(expected===code){
-elResult.textContent="OK";
-setBadge('ok','OK');
-}else{
-elResult.textContent="NG";
-setBadge('ng','NG');
-}
+      // iPhone安定：video要素を連続デコード
+      reader = new ZXing.BrowserMultiFormatReader(
+        new Map([[ZXing.DecodeHintType.POSSIBLE_FORMATS, FORMATS]])
+      );
 
-expected=null;
+      await reader.decodeFromVideoElementContinuously(videoEl, (result, err) => {
+        if (result?.getText){
+          setBadge('wait', expected ? '現品票をスキャンしてください' : '正解をスキャンしてください');
+          handleScan(result.getText());
+        }
+        // errはNotFound等で頻繁に来るので基本無視
+      });
 
-setTimeout(()=>{
-resetAll();
-},1500);
-}
+      setBadge('wait','正解をスキャンしてください');
+      log("decoder running.");
 
-function stopCamera(){
-if(codeReader){
-codeReader.reset();
-}
-btnStart.disabled=false;
-btnStop.disabled=true;
-setBadge('wait','停止');
-}
+    }catch(e){
+      log(`ERROR: ${e?.name || ""} ${e?.message || e}`);
+      alert(`カメラ起動失敗: ${e?.name || ""}\n${e?.message || e}`);
+      btnStart.disabled = false;
+      btnStop.disabled = true;
+    }
+  }
 
-btnStart.onclick=startCamera;
-btnStop.onclick=stopCamera;
-btnReset.onclick=resetAll;
+  async function stopCamera(){
+    try{
+      if (reader){
+        reader.reset();
+        reader = null;
+      }
+    }catch(e){}
 
-resetAll();
+    try{
+      if (stream){
+        stream.getTracks().forEach(t => t.stop());
+        stream = null;
+      }
+    }catch(e){}
+
+    videoEl.srcObject = null;
+
+    btnStart.disabled = false;
+    btnStop.disabled = true;
+    setBadge('wait','停止');
+    log("stopped.");
+  }
+
+  btnStart.addEventListener('click', startCamera);
+  btnStop.addEventListener('click', stopCamera);
+  btnReset.addEventListener('click', resetAll);
+
+  resetAll();
 </script>
-
 </body>
-
 </html>
