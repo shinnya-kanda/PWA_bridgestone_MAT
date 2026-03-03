@@ -62,7 +62,14 @@
 <script>
   // ========= 設定 =========
   const ENABLE_AUDIO = true;
-  const FORMATS = [ZXing.BarcodeFormat.CODE_39];
+  const FORMATS = [
+    ZXing.BarcodeFormat.CODE_39,
+    ZXing.BarcodeFormat.CODE_128,
+    ZXing.BarcodeFormat.CODABAR,
+    ZXing.BarcodeFormat.ITF,
+    ZXing.BarcodeFormat.EAN_13,
+    ZXing.BarcodeFormat.EAN_8
+  ];
 
   // ========= 状態 =========
   let expected = null;
@@ -191,10 +198,15 @@
 
       await reader.decodeFromVideoElementContinuously(videoEl, (result, err) => {
         if (result?.getText){
+          log("DECODE: " + result.getText());   // ← 追加
           setBadge('wait', expected ? '現品票をスキャンしてください' : '正解をスキャンしてください');
           handleScan(result.getText());
+          return;
         }
-        // errはNotFound等で頻繁に来るので基本無視
+        // NotFoundException は「このフレームにバーコードが無い」なので無視でOK
+        if (err && err.name && err.name !== "NotFoundException") {
+          log("ERR: " + err.name + " " + (err.message || ""));
+        }
       });
 
       setBadge('wait','正解をスキャンしてください');
@@ -239,3 +251,4 @@
 </script>
 </body>
 </html>
+
