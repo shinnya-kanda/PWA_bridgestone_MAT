@@ -177,19 +177,24 @@
 
     try{
       log("getUserMedia requesting...");
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        },
-        audio: false
-      });
+     stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: "environment" },
+
+        // ★できるだけ高解像度を要求（細いCode39対策）
+        width:  { ideal: 1920 },
+        height: { ideal: 1080 },
+
+        // ★iPhoneで効くことがある
+        frameRate: { ideal: 30 }
+      },
+      audio: false
+    });
 
       // videoに確実に流す
       videoEl.srcObject = stream;
       await videoEl.play();
-      log("video playing. starting decoder...");
+      log(`video playing. size=${videoEl.videoWidth}x${videoEl.videoHeight}. starting decoder...`);
 
       // iPhone安定：video要素を連続デコード
       reader = new ZXing.BrowserMultiFormatReader(
@@ -251,4 +256,5 @@
 </script>
 </body>
 </html>
+
 
