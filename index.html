@@ -75,10 +75,6 @@
       color: #fff;
     }
 
-    button.secondary {
-      background: #374151;
-    }
-
     button.danger {
       background: #b91c1c;
     }
@@ -483,23 +479,31 @@
       setTimeout(() => beep(220, 220), 260);
     }
 
-    function scrollToWorkArea() {
+    function getWorkAreaTop() {
       const inputTop = inputPanel.getBoundingClientRect().top + window.scrollY;
       const judgeTop = judgeScreen.getBoundingClientRect().top + window.scrollY;
-      const targetTop = Math.min(inputTop, judgeTop) - 12;
-
-      window.scrollTo({
-        top: Math.max(0, targetTop),
-        behavior: 'smooth'
-      });
+      return Math.max(0, Math.min(inputTop, judgeTop) - 12);
     }
 
-    function focusInputWithScroll() {
-      scrollToWorkArea();
+    function scrollThenFocusInput() {
+      const targetTop = getWorkAreaTop();
+
+      window.scrollTo({
+        top: targetTop,
+        behavior: 'smooth'
+      });
 
       setTimeout(() => {
         scanInput.focus({ preventScroll: true });
-      }, 350);
+      }, 450);
+    }
+
+    function scrollWorkAreaOnly() {
+      const targetTop = getWorkAreaTop();
+      window.scrollTo({
+        top: targetTop,
+        behavior: 'smooth'
+      });
     }
 
     function resetAll() {
@@ -521,7 +525,7 @@
 
       clearLog();
       addLog("reset complete");
-      focusInputWithScroll();
+      scrollThenFocusInput();
     }
 
     function handleFirstScan() {
@@ -542,8 +546,8 @@
         );
         addLog("1回目抽出失敗: " + normalizeText(raw));
         beepNg();
-        focusInputWithScroll();
-        scanInput.select();
+        scrollThenFocusInput();
+        setTimeout(() => scanInput.select(), 500);
         return;
       }
 
@@ -567,7 +571,7 @@
 
       addLog(`1回目読取OK: 品番=${parsed.code} / 数量=${parsed.qty}`);
       scanInput.value = "";
-      focusInputWithScroll();
+      scrollThenFocusInput();
       beep(660, 100);
     }
 
@@ -588,8 +592,8 @@
         );
         addLog("2回目形式エラー: " + normalizeText(raw));
         beepNg();
-        focusInputWithScroll();
-        scanInput.select();
+        scrollThenFocusInput();
+        setTimeout(() => scanInput.select(), 500);
         return;
       }
 
@@ -618,7 +622,7 @@
       }
 
       stage = 3;
-      scrollToWorkArea();
+      scrollWorkAreaOnly();
       scanInput.blur();
     }
 
@@ -635,10 +639,10 @@
 
     btnFocus.addEventListener("click", () => {
       if (stage !== 3) {
-        focusInputWithScroll();
-        addLog("input focused with scroll");
+        scrollThenFocusInput();
+        addLog("scroll then focus input");
       } else {
-        scrollToWorkArea();
+        scrollWorkAreaOnly();
         addLog("scrolled to work area");
       }
     });
