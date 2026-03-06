@@ -25,6 +25,10 @@
 
     * { box-sizing: border-box; }
 
+    html {
+      scroll-behavior: smooth;
+    }
+
     body {
       margin: 0;
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", sans-serif;
@@ -115,6 +119,7 @@
       background: #f9fafb;
       padding: 16px;
       margin-top: 12px;
+      scroll-margin-top: 12px;
     }
 
     .label {
@@ -173,6 +178,7 @@
       display: flex;
       flex-direction: column;
       justify-content: center;
+      scroll-margin-top: 12px;
     }
 
     .judge-screen.wait {
@@ -304,7 +310,7 @@
         <span id="stateBadge" class="badge wait">1回目待受</span>
       </div>
 
-      <div class="input-panel">
+      <div class="input-panel" id="inputPanel">
         <div id="inputCaption" class="input-caption">1回目待受</div>
         <div id="inputSubcaption" class="input-subcaption">現品票バーコードを読み込んで、Enterキーで確定してください</div>
 
@@ -366,6 +372,7 @@
     const inputCaption = document.getElementById('inputCaption');
     const inputSubcaption = document.getElementById('inputSubcaption');
 
+    const inputPanel = document.getElementById('inputPanel');
     const judgeScreen = document.getElementById('judgeScreen');
     const judgeMain = document.getElementById('judgeMain');
     const judgeSub = document.getElementById('judgeSub');
@@ -414,8 +421,6 @@
 
     function parseFirstLabel(raw) {
       const text = normalizeText(raw);
-
-      // 1回目：品番(10～12桁英数字) + 空白 + 数量
       const match = text.match(/^([A-Z0-9]{10,12})\s+([0-9]+)$/);
 
       if (!match) {
@@ -478,6 +483,25 @@
       setTimeout(() => beep(220, 220), 260);
     }
 
+    function scrollToWorkArea() {
+      const inputTop = inputPanel.getBoundingClientRect().top + window.scrollY;
+      const judgeTop = judgeScreen.getBoundingClientRect().top + window.scrollY;
+      const targetTop = Math.min(inputTop, judgeTop) - 12;
+
+      window.scrollTo({
+        top: Math.max(0, targetTop),
+        behavior: 'smooth'
+      });
+    }
+
+    function focusInputWithScroll() {
+      scrollToWorkArea();
+
+      setTimeout(() => {
+        scanInput.focus({ preventScroll: true });
+      }, 350);
+    }
+
     function resetAll() {
       stage = 1;
       firstData = {
@@ -497,7 +521,7 @@
 
       clearLog();
       addLog("reset complete");
-      scanInput.focus();
+      focusInputWithScroll();
     }
 
     function handleFirstScan() {
@@ -518,6 +542,7 @@
         );
         addLog("1回目抽出失敗: " + normalizeText(raw));
         beepNg();
+        focusInputWithScroll();
         scanInput.select();
         return;
       }
@@ -542,7 +567,7 @@
 
       addLog(`1回目読取OK: 品番=${parsed.code} / 数量=${parsed.qty}`);
       scanInput.value = "";
-      scanInput.focus();
+      focusInputWithScroll();
       beep(660, 100);
     }
 
@@ -563,6 +588,7 @@
         );
         addLog("2回目形式エラー: " + normalizeText(raw));
         beepNg();
+        focusInputWithScroll();
         scanInput.select();
         return;
       }
@@ -592,6 +618,7 @@
       }
 
       stage = 3;
+      scrollToWorkArea();
       scanInput.blur();
     }
 
@@ -608,8 +635,11 @@
 
     btnFocus.addEventListener("click", () => {
       if (stage !== 3) {
-        scanInput.focus();
-        addLog("input focused");
+        focusInputWithScroll();
+        addLog("input focused with scroll");
+      } else {
+        scrollToWorkArea();
+        addLog("scrolled to work area");
       }
     });
 
@@ -621,7 +651,7 @@
       const tag = e.target.tagName;
       if (tag === "INPUT" || tag === "BUTTON") return;
       if (stage !== 3) {
-        scanInput.focus();
+        scanInput.focus({ preventScroll: true });
       }
     });
 
