@@ -3,285 +3,307 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>現品票・品番ラベル 突合（Enter確定）</title>
+  <title>現品票・品番ラベル 突合（1入力方式）</title>
   <style>
     :root{
-      --bg:#f3f4f6;
+      --bg:#eef2f7;
       --card:#ffffff;
       --text:#111827;
       --muted:#6b7280;
-      --border:#d1d5db;
+      --border:#dbe2ea;
+
+      --blue-bg:#dbeafe;
+      --blue-border:#60a5fa;
+      --blue-text:#1e3a8a;
+
+      --green-bg:#dcfce7;
+      --green-border:#22c55e;
+      --green-text:#166534;
+
+      --red-bg:#fee2e2;
+      --red-border:#ef4444;
+      --red-text:#991b1b;
+
       --dark:#111827;
-      --ok-bg:#dcfce7;
-      --ok-border:#16a34a;
-      --ok-text:#14532d;
-      --ng-bg:#fee2e2;
-      --ng-border:#dc2626;
-      --ng-text:#7f1d1d;
-      --wait-bg:#e0f2fe;
-      --wait-border:#0284c7;
-      --wait-text:#0c4a6e;
     }
 
     * { box-sizing: border-box; }
 
-    html {
-      scroll-behavior: smooth;
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", sans-serif;
     }
 
     body {
-      margin: 0;
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", sans-serif;
-      background: var(--bg);
-      color: var(--text);
+      min-height: 100dvh;
     }
 
     header {
-      background: var(--dark);
+      padding: 10px 12px;
+      background: #111827;
       color: #fff;
-      padding: 16px 18px;
-      font-size: 22px;
       font-weight: 800;
+      font-size: 16px;
+      line-height: 1.4;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 10;
     }
 
     main {
-      max-width: 980px;
+      max-width: 520px;
       margin: 0 auto;
-      padding: 16px 16px 100px;
+      padding: 10px 10px 14px;
     }
 
     .card {
       background: var(--card);
-      border-radius: 18px;
-      padding: 16px;
-      box-shadow: 0 8px 24px rgba(0,0,0,.06);
-      margin-bottom: 16px;
+      border-radius: 14px;
+      padding: 10px;
+      box-shadow: 0 6px 18px rgba(0,0,0,.06);
+      margin-bottom: 10px;
     }
 
     .row {
       display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
+      gap: 8px;
+    }
+
+    .row > * {
+      flex: 1;
     }
 
     button {
+      width: 100%;
       border: 0;
       border-radius: 12px;
-      padding: 13px 18px;
-      font-size: 16px;
+      padding: 12px 10px;
+      font-size: 15px;
       font-weight: 800;
       cursor: pointer;
-      background: var(--dark);
+      background: #111827;
       color: #fff;
+      min-height: 48px;
     }
 
-    button.danger {
-      background: #b91c1c;
-    }
+    button.secondary { background: #374151; }
+    button.danger { background: #b91c1c; }
 
-    .badge {
-      display: inline-block;
-      padding: 7px 12px;
-      border-radius: 999px;
-      font-size: 14px;
-      font-weight: 900;
-    }
-
-    .badge.wait {
-      background: #e5e7eb;
-      color: #111827;
-    }
-
-    .badge.ok {
-      background: #dcfce7;
-      color: #166534;
-    }
-
-    .badge.ng {
-      background: #fee2e2;
-      color: #991b1b;
-    }
-
-    .hint {
-      margin-top: 12px;
-      color: var(--muted);
-      line-height: 1.7;
-      font-size: 14px;
-    }
-
-    .input-panel {
-      border: 3px solid var(--dark);
-      border-radius: 18px;
+    details {
+      border: 1px solid var(--border);
+      border-radius: 12px;
       background: #f9fafb;
-      padding: 16px;
-      margin-top: 12px;
-      scroll-margin-top: 12px;
+      overflow: hidden;
+    }
+
+    summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 12px 14px;
+      font-weight: 800;
+      font-size: 14px;
+      user-select: none;
+      position: relative;
+    }
+
+    summary::-webkit-details-marker { display: none; }
+
+    summary::after {
+      content: "＋";
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 18px;
+      font-weight: 900;
+      color: #374151;
+    }
+
+    details[open] summary::after {
+      content: "－";
+    }
+
+    .hint-body {
+      padding: 0 14px 12px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.65;
+      border-top: 1px solid var(--border);
+      background: #fff;
+    }
+
+    .field {
+      margin-top: 8px;
     }
 
     .label {
+      font-size: 12px;
       font-weight: 800;
-      margin-bottom: 8px;
-      font-size: 16px;
-    }
-
-    .input-caption {
-      font-size: 28px;
-      font-weight: 900;
-      margin-bottom: 10px;
-    }
-
-    .input-subcaption {
-      font-size: 18px;
-      font-weight: 700;
       color: #374151;
-      margin-bottom: 14px;
-      line-height: 1.5;
+      margin-bottom: 5px;
     }
 
     input[type="text"] {
       width: 100%;
-      padding: 18px 16px;
-      border: 3px solid var(--border);
-      border-radius: 14px;
-      font-size: 24px;
+      padding: 14px 12px;
+      border: 2px solid #cfd8e3;
+      border-radius: 12px;
+      font-size: 18px;
+      font-weight: 700;
       background: #fff;
+      min-height: 52px;
     }
 
     input[type="text"]:focus {
       outline: none;
-      border-color: var(--dark);
-      box-shadow: 0 0 0 5px rgba(17,24,39,.08);
+      border-color: #111827;
+      box-shadow: 0 0 0 4px rgba(17,24,39,.08);
     }
 
-    .mono {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      word-break: break-all;
-      font-size: 20px;
-      line-height: 1.6;
-    }
-
-    .field {
-      margin-top: 16px;
-    }
-
-    .judge-screen {
-      border-radius: 22px;
-      border: 4px solid #d1d5db;
-      background: #f9fafb;
-      padding: 28px 20px;
-      text-align: center;
-      min-height: 280px;
-      display: flex;
-      flex-direction: column;
+    .badge {
+      display: inline-flex;
+      align-items: center;
       justify-content: center;
-      scroll-margin-top: 12px;
-    }
-
-    .judge-screen.wait {
-      background: var(--wait-bg);
-      border-color: var(--wait-border);
-      color: var(--wait-text);
-    }
-
-    .judge-screen.ok {
-      background: var(--ok-bg);
-      border-color: var(--ok-border);
-      color: var(--ok-text);
-    }
-
-    .judge-screen.ng {
-      background: var(--ng-bg);
-      border-color: var(--ng-border);
-      color: var(--ng-text);
-    }
-
-    .judge-title {
-      font-size: 26px;
+      min-height: 34px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 13px;
       font-weight: 900;
-      margin-bottom: 12px;
+      background: rgba(255,255,255,.7);
+      color: #111827;
+      border: 1px solid rgba(255,255,255,.7);
+      backdrop-filter: blur(2px);
     }
 
-    .judge-main {
-      font-size: 72px;
+    .status-card {
+      border-radius: 16px;
+      padding: 12px;
+      border: 2px solid var(--blue-border);
+      background: var(--blue-bg);
+      color: var(--blue-text);
+      transition: .2s ease;
+    }
+
+    .status-card.state-blue {
+      background: var(--blue-bg);
+      border-color: var(--blue-border);
+      color: var(--blue-text);
+    }
+
+    .status-card.state-green {
+      background: var(--green-bg);
+      border-color: var(--green-border);
+      color: var(--green-text);
+    }
+
+    .status-card.state-red {
+      background: var(--red-bg);
+      border-color: var(--red-border);
+      color: var(--red-text);
+    }
+
+    .status-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .status-title {
+      font-size: 13px;
+      font-weight: 900;
+      opacity: .9;
+    }
+
+    .result-main {
+      font-size: 30px;
       font-weight: 1000;
-      line-height: 1.1;
-      letter-spacing: .04em;
+      line-height: 1.15;
+      letter-spacing: .02em;
+      margin-top: 4px;
     }
 
-    .judge-sub {
-      margin-top: 14px;
-      font-size: 26px;
-      font-weight: 900;
-      line-height: 1.5;
-      white-space: pre-line;
-    }
-
-    .judge-detail {
-      margin-top: 18px;
-      font-size: 22px;
+    .result-sub {
+      margin-top: 6px;
+      font-size: 15px;
       font-weight: 800;
-      line-height: 1.6;
-      white-space: pre-line;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+
+    .mini-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .mini-item {
+      background: rgba(255,255,255,.55);
+      border: 1px solid rgba(255,255,255,.7);
+      border-radius: 12px;
+      padding: 8px 10px;
+    }
+
+    .mini-item .mini-label {
+      font-size: 11px;
+      font-weight: 900;
+      opacity: .85;
+      margin-bottom: 4px;
+    }
+
+    .mini-item .mini-value {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 14px;
+      font-weight: 800;
+      word-break: break-all;
+      line-height: 1.4;
     }
 
     .log {
       background: #111827;
       color: #e5e7eb;
       border-radius: 12px;
-      padding: 12px;
+      padding: 10px;
       white-space: pre-wrap;
-      font-size: 13px;
-      line-height: 1.5;
-      max-height: 280px;
+      font-size: 12px;
+      line-height: 1.45;
+      min-height: 120px;
+      max-height: 180px;
       overflow: auto;
     }
 
-    footer {
-      position: fixed;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(243,244,246,.96);
-      backdrop-filter: blur(8px);
-      border-top: 1px solid #e5e7eb;
-      padding: 10px 14px;
+    .footer-note {
       color: var(--muted);
-      font-size: 13px;
+      font-size: 11px;
+      line-height: 1.5;
+      text-align: center;
+      padding: 4px 6px 0;
     }
 
-    @media (max-width: 640px) {
-      .input-caption {
-        font-size: 23px;
+    @media (max-width: 430px) {
+      .result-main {
+        font-size: 26px;
       }
-
-      .input-subcaption {
-        font-size: 16px;
+      .result-sub {
+        font-size: 14px;
       }
-
       input[type="text"] {
-        font-size: 20px;
-      }
-
-      .judge-main {
-        font-size: 56px;
-      }
-
-      .judge-sub {
-        font-size: 22px;
-      }
-
-      .judge-detail {
-        font-size: 18px;
-      }
-
-      .mono {
         font-size: 17px;
+      }
+      button {
+        font-size: 14px;
       }
     }
   </style>
 </head>
 <body>
-  <header>現品票・品番ラベル 突合（Bluetoothバーコードリーダー入力）</header>
+  <header>現品票・品番ラベル 突合</header>
 
   <main>
     <div class="card">
@@ -290,26 +312,22 @@
         <button id="btnReset" class="danger">最初に戻す</button>
       </div>
 
-      <div class="hint">
-        使用方法：<br>
-        ① 1回目で現品票バーコードを読み込み、Enterで確定<br>
-        ② 1回目データから「品番（10〜12桁英数字）＋数量」を抽出して表示<br>
-        ③ 2回目で品番ラベルバーコードを読み込み、Enterで確定<br>
-        ④ 1回目品番と2回目品番を突合し、判定を大きく表示<br>
-        ⑤ 判定後は「最初に戻す」を押して次の処理へ進む
+      <div class="field">
+        <details>
+          <summary>使用方法を表示</summary>
+          <div class="hint-body">
+            ① Bluetoothバーコードリーダーをスマホに接続（HID/キーボードモード）<br>
+            ② 1回目で現品票データを読む（品番 + 空白 + 数量 を含むデータ）<br>
+            ③ 自動で2回目待受へ切替<br>
+            ④ 2回目で品番ラベルを読む（10〜12桁の英数字）<br>
+            ⑤ 一致 / 不一致 を大きく表示<br>
+            ⑥ 「最初に戻す」で次の突合へ進む<br>
+            ※ 多くのバーコードリーダーは読取後に Enter を送るため自動確定されます
+          </div>
+        </details>
       </div>
-    </div>
 
-    <div class="card">
-      <div>
-        状態：
-        <span id="stateBadge" class="badge wait">1回目待受</span>
-      </div>
-
-      <div class="input-panel" id="inputPanel">
-        <div id="inputCaption" class="input-caption">1回目待受</div>
-        <div id="inputSubcaption" class="input-subcaption">現品票バーコードを読み込んで、Enterキーで確定してください</div>
-
+      <div class="field">
         <div class="label">入力欄（1回目・2回目共通）</div>
         <input
           id="scanInput"
@@ -323,29 +341,30 @@
       </div>
     </div>
 
-    <div class="card">
-      <div class="judge-screen wait" id="judgeScreen">
-        <div class="judge-title">判定表示</div>
-        <div class="judge-main" id="judgeMain">待機中</div>
-        <div class="judge-sub" id="judgeSub">1回目の現品票を読んでください</div>
-        <div class="judge-detail" id="judgeDetail"></div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="field">
-        <div class="label">1回目 現品票 生データ</div>
-        <div id="firstRawView" class="mono">—</div>
+    <div id="statusCard" class="status-card state-blue">
+      <div class="status-top">
+        <div class="status-title">状態 / 判定</div>
+        <span id="stateBadge" class="badge">1回目待受</span>
       </div>
 
-      <div class="field">
-        <div class="label">1回目 抽出結果</div>
-        <div id="firstParsedView" class="mono">—</div>
-      </div>
+      <div id="resultText" class="result-main">現品票を読み込んでください</div>
+      <div id="resultSubText" class="result-sub">1回目の読取待機中です</div>
 
-      <div class="field">
-        <div class="label">2回目 品番ラベル</div>
-        <div id="secondCodeView" class="mono">—</div>
+      <div class="mini-grid">
+        <div class="mini-item">
+          <div class="mini-label">1回目 現品票 生データ</div>
+          <div id="firstRawView" class="mini-value">—</div>
+        </div>
+
+        <div class="mini-item">
+          <div class="mini-label">1回目 抽出結果</div>
+          <div id="firstParsedView" class="mini-value">—</div>
+        </div>
+
+        <div class="mini-item">
+          <div class="mini-label">2回目 品番ラベル</div>
+          <div id="secondCodeView" class="mini-value">—</div>
+        </div>
       </div>
     </div>
 
@@ -353,33 +372,30 @@
       <div class="label">ログ</div>
       <div id="log" class="log">log: ready</div>
     </div>
-  </main>
 
-  <footer>
-    推奨運用：不一致時はその場で作業中断 → 現物・現品票・品番ラベルを再確認。
-  </footer>
+    <div class="footer-note">
+      不一致時は作業を中断し、現物・現品票・ラベルを再確認してください。
+    </div>
+  </main>
 
   <script>
     const scanInput = document.getElementById('scanInput');
     const btnFocus = document.getElementById('btnFocus');
     const btnReset = document.getElementById('btnReset');
 
+    const statusCard = document.getElementById('statusCard');
     const stateBadge = document.getElementById('stateBadge');
-    const inputCaption = document.getElementById('inputCaption');
-    const inputSubcaption = document.getElementById('inputSubcaption');
-
-    const inputPanel = document.getElementById('inputPanel');
-    const judgeScreen = document.getElementById('judgeScreen');
-    const judgeMain = document.getElementById('judgeMain');
-    const judgeSub = document.getElementById('judgeSub');
-    const judgeDetail = document.getElementById('judgeDetail');
 
     const firstRawView = document.getElementById('firstRawView');
     const firstParsedView = document.getElementById('firstParsedView');
     const secondCodeView = document.getElementById('secondCodeView');
+
+    const resultText = document.getElementById('resultText');
+    const resultSubText = document.getElementById('resultSubText');
+
     const logEl = document.getElementById('log');
 
-    let stage = 1; // 1: 現品票入力待受 / 2: 品番ラベル入力待受 / 3: 判定完了
+    let stage = 1; // 1: 現品票待受, 2: 品番ラベル待受, 3: 判定後停止
     let firstData = {
       raw: "",
       code: "",
@@ -397,6 +413,33 @@
 
     function clearLog() {
       logEl.textContent = "log: ready";
+    }
+
+    function setCardState(mode, badgeText, mainText, subText) {
+      statusCard.className = "status-card " + mode;
+      stateBadge.textContent = badgeText;
+      resultText.textContent = mainText;
+      resultSubText.textContent = subText || "";
+    }
+
+    function beep(freq = 880, ms = 120) {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = freq;
+        osc.type = "sine";
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.01);
+        osc.start();
+        setTimeout(() => {
+          gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.02);
+          osc.stop(ctx.currentTime + 0.03);
+          ctx.close();
+        }, ms);
+      } catch (e) {}
     }
 
     function normalizeText(str) {
@@ -417,7 +460,7 @@
 
     function parseFirstLabel(raw) {
       const text = normalizeText(raw);
-      const match = text.match(/^([A-Z0-9]{10,12})\s+([0-9]+)$/);
+      const match = text.match(/([A-Z0-9]{10,12})\s+([0-9]+)/);
 
       if (!match) {
         return {
@@ -436,118 +479,48 @@
       };
     }
 
-    function setBadge(type, text) {
-      stateBadge.className = "badge " + type;
-      stateBadge.textContent = text;
-    }
-
-    function setInputGuide(title, sub) {
-      inputCaption.textContent = title;
-      inputSubcaption.textContent = sub;
-    }
-
-    function setJudge(type, main, sub, detail = "") {
-      judgeScreen.className = "judge-screen " + type;
-      judgeMain.textContent = main;
-      judgeSub.textContent = sub;
-      judgeDetail.textContent = detail;
-    }
-
-    function beep(freq = 880, ms = 120) {
-      try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.frequency.value = freq;
-        osc.type = "sine";
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.01);
-        osc.start();
-
-        setTimeout(() => {
-          gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.02);
-          osc.stop(ctx.currentTime + 0.03);
-          ctx.close();
-        }, ms);
-      } catch (e) {}
-    }
-
-    function beepNg() {
-      beep(220, 220);
-      setTimeout(() => beep(220, 220), 260);
-    }
-
-    function getWorkAreaTop() {
-      const inputTop = inputPanel.getBoundingClientRect().top + window.scrollY;
-      const judgeTop = judgeScreen.getBoundingClientRect().top + window.scrollY;
-      return Math.max(0, Math.min(inputTop, judgeTop) - 12);
-    }
-
-    function scrollThenFocusInput() {
-      const targetTop = getWorkAreaTop();
-
-      window.scrollTo({
-        top: targetTop,
-        behavior: 'smooth'
-      });
-
-      setTimeout(() => {
-        scanInput.focus({ preventScroll: true });
-      }, 450);
-    }
-
-    function scrollWorkAreaOnly() {
-      const targetTop = getWorkAreaTop();
-      window.scrollTo({
-        top: targetTop,
-        behavior: 'smooth'
-      });
-    }
-
     function resetAll() {
       stage = 1;
-      firstData = {
-        raw: "",
-        code: "",
-        qty: ""
-      };
+      firstData = { raw: "", code: "", qty: "" };
 
       scanInput.value = "";
       firstRawView.textContent = "—";
       firstParsedView.textContent = "—";
       secondCodeView.textContent = "—";
 
-      setBadge("wait", "1回目待受");
-      setInputGuide("1回目待受", "現品票バーコードを読み込んで、Enterキーで確定してください");
-      setJudge("wait", "待機中", "1回目の現品票を読んでください", "");
+      setCardState(
+        "state-blue",
+        "1回目待受",
+        "現品票を読み込んでください",
+        "1回目の読取待機中です"
+      );
 
       clearLog();
       addLog("reset complete");
-      scrollThenFocusInput();
+      scanInput.focus();
     }
 
-    function handleFirstScan() {
+    function acceptFirstScan() {
       const raw = scanInput.value;
       const parsed = parseFirstLabel(raw);
 
-      firstRawView.textContent = normalizeText(raw);
+      firstRawView.textContent = normalizeText(raw) || "—";
 
       if (!parsed.ok) {
         firstParsedView.textContent = "抽出失敗";
-        setBadge("ng", "1回目エラー");
-        setInputGuide("1回目待受", "現品票バーコードを正しい形式で再入力してください");
-        setJudge(
-          "ng",
-          "読取エラー",
-          "1回目の形式が不正です",
-          "正しい形式：\n品番10～12桁の英数字 + 空白 + 数量"
+        secondCodeView.textContent = "—";
+
+        setCardState(
+          "state-red",
+          "1回目エラー",
+          "1回目 読取エラー",
+          "現品票から 品番（10〜12桁）＋数量 を抽出できません"
         );
+
         addLog("1回目抽出失敗: " + normalizeText(raw));
-        beepNg();
-        scrollThenFocusInput();
-        setTimeout(() => scanInput.select(), 500);
+        beep(220, 220);
+        setTimeout(() => beep(220, 220), 260);
+        scanInput.select();
         return;
       }
 
@@ -559,103 +532,123 @@
 
       firstParsedView.textContent = `品番: ${parsed.code} / 数量: ${parsed.qty}`;
 
-      stage = 2;
-      setBadge("wait", "2回目待受");
-      setInputGuide("2回目待受", "品番ラベルバーコードを読み込んで、Enterキーで確定してください");
-      setJudge(
-        "wait",
-        "1回目OK",
-        "2回目の品番ラベルを読んでください",
-        `1回目品番：${parsed.code}\n数量：${parsed.qty}`
+      setCardState(
+        "state-blue",
+        "2回目待受",
+        "1回目 読取OK",
+        "品番ラベルを読み込んでください"
       );
 
-      addLog(`1回目読取OK: 品番=${parsed.code} / 数量=${parsed.qty}`);
+      addLog(`1回目読取: 品番=${parsed.code} / 数量=${parsed.qty}`);
+
+      stage = 2;
       scanInput.value = "";
-      scrollThenFocusInput();
+      scanInput.focus();
       beep(660, 100);
     }
 
-    function handleSecondScan() {
+    function judgeSecondScan() {
       const raw = scanInput.value;
-      const secondCode = normalizeCode(raw);
+      const code = normalizeCode(raw);
 
-      secondCodeView.textContent = secondCode || "—";
+      secondCodeView.textContent = code || "—";
 
-      if (!isValidCode(secondCode)) {
-        setBadge("ng", "2回目エラー");
-        setInputGuide("2回目待受", "品番ラベルバーコードを正しい形式で再入力してください");
-        setJudge(
-          "ng",
-          "読取エラー",
-          "2回目の形式が不正です",
-          "正しい形式：\n品番10～12桁の英数字のみ"
+      if (!isValidCode(code)) {
+        setCardState(
+          "state-red",
+          "2回目エラー",
+          "2回目 読取エラー",
+          "品番ラベルは 10〜12桁の英数字 で読んでください"
         );
+
         addLog("2回目形式エラー: " + normalizeText(raw));
-        beepNg();
-        scrollThenFocusInput();
-        setTimeout(() => scanInput.select(), 500);
+        beep(220, 220);
+        setTimeout(() => beep(220, 220), 260);
+        scanInput.select();
         return;
       }
 
-      if (secondCode === firstData.code) {
-        setBadge("ok", "一致");
-        setInputGuide("判定完了", "「最初に戻す」を押して次の処理へ進んでください");
-        setJudge(
-          "ok",
+      if (code === firstData.code) {
+        setCardState(
+          "state-green",
+          "一致",
           "正解",
-          "1回目と2回目の品番が一致しました",
-          `品番：${secondCode}\n数量：${firstData.qty}`
+          `一致：${code} / 数量：${firstData.qty}`
         );
-        addLog(`突合OK: 1回目=${firstData.code} / 2回目=${secondCode} / 数量=${firstData.qty}`);
+
+        addLog(`突合結果: 正解 / 1回目=${firstData.code} / 2回目=${code} / 数量=${firstData.qty}`);
         beep(1040, 150);
       } else {
-        setBadge("ng", "不一致");
-        setInputGuide("判定完了", "不一致です。確認後、「最初に戻す」を押してください");
-        setJudge(
-          "ng",
+        setCardState(
+          "state-red",
           "不一致",
-          "1回目と2回目の品番が一致しません",
-          `1回目品番：${firstData.code}\n2回目品番：${secondCode}\n数量：${firstData.qty}`
+          "不一致",
+          `1回目：${firstData.code} / 2回目：${code} / 数量：${firstData.qty}`
         );
-        addLog(`突合NG: 1回目=${firstData.code} / 2回目=${secondCode} / 数量=${firstData.qty}`);
-        beepNg();
+
+        addLog(`突合結果: 不一致 / 1回目=${firstData.code} / 2回目=${code} / 数量=${firstData.qty}`);
+        beep(220, 220);
+        setTimeout(() => beep(220, 220), 260);
       }
 
       stage = 3;
-      scrollWorkAreaOnly();
       scanInput.blur();
     }
 
-    function handleEnter(e) {
-      if (e.key !== "Enter") return;
-      e.preventDefault();
-
+    function handleScan() {
       if (stage === 1) {
-        handleFirstScan();
+        acceptFirstScan();
       } else if (stage === 2) {
-        handleSecondScan();
+        judgeSecondScan();
       }
     }
 
+    function onEnter(e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        handleScan();
+      }
+    }
+
+    let inputTimer = null;
+    scanInput.addEventListener("input", () => {
+      if (stage === 3) return;
+
+      clearTimeout(inputTimer);
+      inputTimer = setTimeout(() => {
+        const val = normalizeText(scanInput.value);
+        if (!val) return;
+
+        if (stage === 1) {
+          const parsed = parseFirstLabel(scanInput.value);
+          if (parsed.ok) {
+            acceptFirstScan();
+          }
+        } else if (stage === 2) {
+          const code = normalizeCode(scanInput.value);
+          if (isValidCode(code)) {
+            judgeSecondScan();
+          }
+        }
+      }, 220);
+    });
+
+    scanInput.addEventListener("keydown", onEnter);
+
     btnFocus.addEventListener("click", () => {
       if (stage !== 3) {
-        scrollThenFocusInput();
-        addLog("scroll then focus input");
-      } else {
-        scrollWorkAreaOnly();
-        addLog("scrolled to work area");
+        scanInput.focus();
+        addLog("input focused");
       }
     });
 
     btnReset.addEventListener("click", resetAll);
 
-    scanInput.addEventListener("keydown", handleEnter);
-
     document.addEventListener("click", (e) => {
       const tag = e.target.tagName;
-      if (tag === "INPUT" || tag === "BUTTON") return;
+      if (tag === "INPUT" || tag === "BUTTON" || tag === "SUMMARY") return;
       if (stage !== 3) {
-        scanInput.focus({ preventScroll: true });
+        scanInput.focus();
       }
     });
 
