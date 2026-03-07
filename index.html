@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>現品票・品番ラベル 突合（1入力方式）</title>
+  <title>現品票・品番ラベル 突合</title>
   <style>
     :root{
       --bg:#eef2f7;
@@ -23,8 +23,6 @@
       --red-bg:#fee2e2;
       --red-border:#ef4444;
       --red-text:#991b1b;
-
-      --dark:#111827;
     }
 
     * { box-sizing: border-box; }
@@ -90,7 +88,6 @@
       min-height: 48px;
     }
 
-    button.secondary { background: #374151; }
     button.danger { background: #b91c1c; }
 
     details {
@@ -316,13 +313,12 @@
         <details>
           <summary>使用方法を表示</summary>
           <div class="hint-body">
-            ① Bluetoothバーコードリーダーをスマホに接続（HID/キーボードモード）<br>
-            ② 1回目で現品票データを読む（品番 + 空白 + 数量 を含むデータ）<br>
-            ③ 自動で2回目待受へ切替<br>
-            ④ 2回目で品番ラベルを読む（10〜12桁の英数字）<br>
-            ⑤ 一致 / 不一致 を大きく表示<br>
-            ⑥ 「最初に戻す」で次の突合へ進む<br>
-            ※ 多くのバーコードリーダーは読取後に Enter を送るため自動確定されます
+            ① 1回目で現品票を読む（10〜12桁英数字 + 空白 + 数量）<br>
+            ② Enter押下で1回目を確定し、2回目待受へ移行<br>
+            ③ 2回目で品番ラベルを読む（10〜12桁英数字）<br>
+            ④ Enter押下で一致 / 不一致を判定<br>
+            ⑤ 判定後は停止し、「最初に戻す」で次へ進む<br>
+            ※ BluetoothバーコードリーダーがEnterを送信する設定なら、そのまま確定できます
           </div>
         </details>
       </div>
@@ -347,8 +343,8 @@
         <span id="stateBadge" class="badge">1回目待受</span>
       </div>
 
-      <div id="resultText" class="result-main">現品票を読み込んでください</div>
-      <div id="resultSubText" class="result-sub">1回目の読取待機中です</div>
+      <div id="resultText" class="result-main">現品票を読み込んで Enter を押してください</div>
+      <div id="resultSubText" class="result-sub">1回目待機中です</div>
 
       <div class="mini-grid">
         <div class="mini-item">
@@ -395,7 +391,7 @@
 
     const logEl = document.getElementById('log');
 
-    let stage = 1; // 1: 現品票待受, 2: 品番ラベル待受, 3: 判定後停止
+    let stage = 1; // 1: 1回目待受, 2: 2回目待受, 3: 判定後停止
     let firstData = {
       raw: "",
       code: "",
@@ -460,7 +456,7 @@
 
     function parseFirstLabel(raw) {
       const text = normalizeText(raw);
-      const match = text.match(/([A-Z0-9]{10,12})\s+([0-9]+)/);
+      const match = text.match(/^([A-Z0-9]{10,12})\s+([0-9]+)$/);
 
       if (!match) {
         return {
@@ -479,6 +475,22 @@
       };
     }
 
+    function parseSecondLabel(raw) {
+      const code = normalizeCode(raw);
+
+      if (!isValidCode(code)) {
+        return {
+          ok: false,
+          code: ""
+        };
+      }
+
+      return {
+        ok: true,
+        code
+      };
+    }
+
     function resetAll() {
       stage = 1;
       firstData = { raw: "", code: "", qty: "" };
@@ -491,8 +503,8 @@
       setCardState(
         "state-blue",
         "1回目待受",
-        "現品票を読み込んでください",
-        "1回目の読取待機中です"
+        "現品票を読み込んで Enter を押してください",
+        "1回目待機中です"
       );
 
       clearLog();
@@ -514,12 +526,13 @@
           "state-red",
           "1回目エラー",
           "1回目 読取エラー",
-          "現品票から 品番（10〜12桁）＋数量 を抽出できません"
+          "形式は「10〜12桁英数字 + 空白 + 数量」です"
         );
 
-        addLog("1回目抽出失敗: " + normalizeText(raw));
+        addLog("1回目形式エラー: " + normalizeText(raw));
         beep(220, 220);
         setTimeout(() => beep(220, 220), 260);
+        scanInput.focus();
         scanInput.select();
         return;
       }
@@ -536,10 +549,10 @@
         "state-blue",
         "2回目待受",
         "1回目 読取OK",
-        "品番ラベルを読み込んでください"
+        "2回目で品番ラベルを読み込んで Enter を押してください"
       );
 
-      addLog(`1回目読取: 品番=${parsed.code} / 数量=${parsed.qty}`);
+      addLog(`1回目確定: 品番=${parsed.code} / 数量=${parsed.qty}`);
 
       stage = 2;
       scanInput.value = "";
@@ -549,44 +562,45 @@
 
     function judgeSecondScan() {
       const raw = scanInput.value;
-      const code = normalizeCode(raw);
+      const parsed = parseSecondLabel(raw);
 
-      secondCodeView.textContent = code || "—";
+      secondCodeView.textContent = normalizeCode(raw) || "—";
 
-      if (!isValidCode(code)) {
+      if (!parsed.ok) {
         setCardState(
           "state-red",
           "2回目エラー",
           "2回目 読取エラー",
-          "品番ラベルは 10〜12桁の英数字 で読んでください"
+          "品番ラベルは10〜12桁の英数字です"
         );
 
         addLog("2回目形式エラー: " + normalizeText(raw));
         beep(220, 220);
         setTimeout(() => beep(220, 220), 260);
+        scanInput.focus();
         scanInput.select();
         return;
       }
 
-      if (code === firstData.code) {
+      if (parsed.code === firstData.code) {
         setCardState(
           "state-green",
           "一致",
           "正解",
-          `一致：${code} / 数量：${firstData.qty}`
+          `一致：${parsed.code} / 数量：${firstData.qty}`
         );
 
-        addLog(`突合結果: 正解 / 1回目=${firstData.code} / 2回目=${code} / 数量=${firstData.qty}`);
+        addLog(`突合結果: 正解 / 1回目=${firstData.code} / 2回目=${parsed.code} / 数量=${firstData.qty}`);
         beep(1040, 150);
       } else {
         setCardState(
           "state-red",
           "不一致",
           "不一致",
-          `1回目：${firstData.code} / 2回目：${code} / 数量：${firstData.qty}`
+          `1回目：${firstData.code} / 2回目：${parsed.code} / 数量：${firstData.qty}`
         );
 
-        addLog(`突合結果: 不一致 / 1回目=${firstData.code} / 2回目=${code} / 数量=${firstData.qty}`);
+        addLog(`突合結果: 不一致 / 1回目=${firstData.code} / 2回目=${parsed.code} / 数量=${firstData.qty}`);
         beep(220, 220);
         setTimeout(() => beep(220, 220), 260);
       }
@@ -600,45 +614,24 @@
         acceptFirstScan();
       } else if (stage === 2) {
         judgeSecondScan();
+      } else {
+        addLog("判定後停止中: 最初に戻す を押してください");
       }
     }
 
-    function onEnter(e) {
+    scanInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
         handleScan();
       }
-    }
-
-    let inputTimer = null;
-    scanInput.addEventListener("input", () => {
-      if (stage === 3) return;
-
-      clearTimeout(inputTimer);
-      inputTimer = setTimeout(() => {
-        const val = normalizeText(scanInput.value);
-        if (!val) return;
-
-        if (stage === 1) {
-          const parsed = parseFirstLabel(scanInput.value);
-          if (parsed.ok) {
-            acceptFirstScan();
-          }
-        } else if (stage === 2) {
-          const code = normalizeCode(scanInput.value);
-          if (isValidCode(code)) {
-            judgeSecondScan();
-          }
-        }
-      }, 220);
     });
-
-    scanInput.addEventListener("keydown", onEnter);
 
     btnFocus.addEventListener("click", () => {
       if (stage !== 3) {
         scanInput.focus();
         addLog("input focused");
+      } else {
+        addLog("判定後停止中のため、最初に戻す待機");
       }
     });
 
