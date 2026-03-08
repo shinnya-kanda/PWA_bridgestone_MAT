@@ -1,9 +1,19 @@
-<!doctype html>
+ <!doctype html>
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>現品票・品番ラベル 突合</title>
+
+  <meta name="theme-color" content="#111827" />
+  <meta name="description" content="現品票と品番ラベルの突合を行うPWAアプリ" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="現品票突合" />
+
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+
   <style>
     :root{
       --bg:#eef2f7;
@@ -86,6 +96,7 @@
       background: #111827;
       color: #fff;
       min-height: 48px;
+      -webkit-tap-highlight-color: transparent;
     }
 
     button.danger { background: #b91c1c; }
@@ -391,7 +402,7 @@
 
     const logEl = document.getElementById('log');
 
-    let stage = 1; // 1: 1回目待受, 2: 2回目待受, 3: 判定後停止
+    let stage = 1;
     let firstData = {
       raw: "",
       code: "",
@@ -646,6 +657,17 @@
     });
 
     resetAll();
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', async () => {
+        try {
+          await navigator.serviceWorker.register('./service-worker.js');
+          console.log('Service Worker registered');
+        } catch (err) {
+          console.error('Service Worker registration failed:', err);
+        }
+      });
+    }
   </script>
 </body>
 </html>
