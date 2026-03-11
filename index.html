@@ -1,673 +1,286 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>現品票・品番ラベル 突合</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>現品票・品番ラベル 突合</title>
 
-  <meta name="theme-color" content="#111827" />
-  <meta name="description" content="現品票と品番ラベルの突合を行うPWAアプリ" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="現品票突合" />
+<style>
+body{
+font-family:sans-serif;
+background:#eef2f7;
+margin:0;
+}
 
-  <link rel="manifest" href="manifest.json" />
-  <link rel="apple-touch-icon" href="icon-192.png" />
+header{
+background:#111827;
+color:white;
+text-align:center;
+padding:10px;
+font-weight:bold;
+}
 
-  <style>
-    :root{
-      --bg:#eef2f7;
-      --card:#ffffff;
-      --text:#111827;
-      --muted:#6b7280;
-      --border:#dbe2ea;
+main{
+max-width:520px;
+margin:auto;
+padding:10px;
+}
 
-      --blue-bg:#dbeafe;
-      --blue-border:#60a5fa;
-      --blue-text:#1e3a8a;
+.card{
+background:white;
+padding:10px;
+border-radius:10px;
+margin-bottom:10px;
+}
 
-      --green-bg:#dcfce7;
-      --green-border:#22c55e;
-      --green-text:#166534;
+button{
+width:100%;
+padding:12px;
+margin-top:6px;
+font-size:16px;
+}
 
-      --red-bg:#fee2e2;
-      --red-border:#ef4444;
-      --red-text:#991b1b;
-    }
+input{
+width:100%;
+padding:12px;
+font-size:20px;
+}
 
-    * { box-sizing: border-box; }
+.status{
+padding:10px;
+font-size:26px;
+font-weight:bold;
+text-align:center;
+}
 
-    html, body {
-      margin: 0;
-      padding: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", sans-serif;
-    }
+.blue{background:#dbeafe;}
+.green{background:#dcfce7;}
+.red{background:#fee2e2;}
 
-    body {
-      min-height: 100dvh;
-    }
-
-    header {
-      padding: 10px 12px;
-      background: #111827;
-      color: #fff;
-      font-weight: 800;
-      font-size: 16px;
-      line-height: 1.4;
-      text-align: center;
-      position: sticky;
-      top: 0;
-      z-index: 10;
-    }
-
-    main {
-      max-width: 520px;
-      margin: 0 auto;
-      padding: 10px 10px 14px;
-    }
-
-    .card {
-      background: var(--card);
-      border-radius: 14px;
-      padding: 10px;
-      box-shadow: 0 6px 18px rgba(0,0,0,.06);
-      margin-bottom: 10px;
-    }
-
-    .row {
-      display: flex;
-      gap: 8px;
-    }
-
-    .row > * {
-      flex: 1;
-    }
-
-    button {
-      width: 100%;
-      border: 0;
-      border-radius: 12px;
-      padding: 12px 10px;
-      font-size: 15px;
-      font-weight: 800;
-      cursor: pointer;
-      background: #111827;
-      color: #fff;
-      min-height: 48px;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    button.danger { background: #b91c1c; }
-
-    details {
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      background: #f9fafb;
-      overflow: hidden;
-    }
-
-    summary {
-      list-style: none;
-      cursor: pointer;
-      padding: 12px 14px;
-      font-weight: 800;
-      font-size: 14px;
-      user-select: none;
-      position: relative;
-    }
-
-    summary::-webkit-details-marker { display: none; }
-
-    summary::after {
-      content: "＋";
-      position: absolute;
-      right: 14px;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 18px;
-      font-weight: 900;
-      color: #374151;
-    }
-
-    details[open] summary::after {
-      content: "－";
-    }
-
-    .hint-body {
-      padding: 0 14px 12px;
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.65;
-      border-top: 1px solid var(--border);
-      background: #fff;
-    }
-
-    .field {
-      margin-top: 8px;
-    }
-
-    .label {
-      font-size: 12px;
-      font-weight: 800;
-      color: #374151;
-      margin-bottom: 5px;
-    }
-
-    input[type="text"] {
-      width: 100%;
-      padding: 14px 12px;
-      border: 2px solid #cfd8e3;
-      border-radius: 12px;
-      font-size: 18px;
-      font-weight: 700;
-      background: #fff;
-      min-height: 52px;
-    }
-
-    input[type="text"]:focus {
-      outline: none;
-      border-color: #111827;
-      box-shadow: 0 0 0 4px rgba(17,24,39,.08);
-    }
-
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 34px;
-      padding: 6px 12px;
-      border-radius: 999px;
-      font-size: 13px;
-      font-weight: 900;
-      background: rgba(255,255,255,.7);
-      color: #111827;
-      border: 1px solid rgba(255,255,255,.7);
-      backdrop-filter: blur(2px);
-    }
-
-    .status-card {
-      border-radius: 16px;
-      padding: 12px;
-      border: 2px solid var(--blue-border);
-      background: var(--blue-bg);
-      color: var(--blue-text);
-      transition: .2s ease;
-    }
-
-    .status-card.state-blue {
-      background: var(--blue-bg);
-      border-color: var(--blue-border);
-      color: var(--blue-text);
-    }
-
-    .status-card.state-green {
-      background: var(--green-bg);
-      border-color: var(--green-border);
-      color: var(--green-text);
-    }
-
-    .status-card.state-red {
-      background: var(--red-bg);
-      border-color: var(--red-border);
-      color: var(--red-text);
-    }
-
-    .status-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-
-    .status-title {
-      font-size: 13px;
-      font-weight: 900;
-      opacity: .9;
-    }
-
-    .result-main {
-      font-size: 30px;
-      font-weight: 1000;
-      line-height: 1.15;
-      letter-spacing: .02em;
-      margin-top: 4px;
-    }
-
-    .result-sub {
-      margin-top: 6px;
-      font-size: 15px;
-      font-weight: 800;
-      line-height: 1.45;
-      word-break: break-word;
-    }
-
-    .mini-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 8px;
-      margin-top: 10px;
-    }
-
-    .mini-item {
-      background: rgba(255,255,255,.55);
-      border: 1px solid rgba(255,255,255,.7);
-      border-radius: 12px;
-      padding: 8px 10px;
-    }
-
-    .mini-item .mini-label {
-      font-size: 11px;
-      font-weight: 900;
-      opacity: .85;
-      margin-bottom: 4px;
-    }
-
-    .mini-item .mini-value {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 14px;
-      font-weight: 800;
-      word-break: break-all;
-      line-height: 1.4;
-    }
-
-    .log {
-      background: #111827;
-      color: #e5e7eb;
-      border-radius: 12px;
-      padding: 10px;
-      white-space: pre-wrap;
-      font-size: 12px;
-      line-height: 1.45;
-      min-height: 120px;
-      max-height: 180px;
-      overflow: auto;
-    }
-
-    .footer-note {
-      color: var(--muted);
-      font-size: 11px;
-      line-height: 1.5;
-      text-align: center;
-      padding: 4px 6px 0;
-    }
-
-    @media (max-width: 430px) {
-      .result-main {
-        font-size: 26px;
-      }
-      .result-sub {
-        font-size: 14px;
-      }
-      input[type="text"] {
-        font-size: 17px;
-      }
-      button {
-        font-size: 14px;
-      }
-    }
-  </style>
+.log{
+background:black;
+color:#eee;
+padding:10px;
+height:120px;
+overflow:auto;
+font-size:12px;
+}
+</style>
 </head>
+
 <body>
-  <header>現品票・品番ラベル 突合</header>
 
-  <main>
-    <div class="card">
-      <div class="row">
-        <button id="btnFocus">入力欄へフォーカス</button>
-        <button id="btnReset" class="danger">最初に戻す</button>
-      </div>
+<header>現品票・品番ラベル 突合</header>
 
-      <div class="field">
-        <details>
-          <summary>使用方法を表示</summary>
-          <div class="hint-body">
-            ① 1回目で現品票を読む（10〜12桁英数字 + 空白 + 数量）<br>
-            ② Enter押下で1回目を確定し、2回目待受へ移行<br>
-            ③ 2回目で品番ラベルを読む（10〜12桁英数字）<br>
-            ④ Enter押下で一致 / 不一致を判定<br>
-            ⑤ 判定後は停止し、「最初に戻す」で次へ進む<br>
-            ※ BluetoothバーコードリーダーがEnterを送信する設定なら、そのまま確定できます
-          </div>
-        </details>
-      </div>
+<main>
 
-      <div class="field">
-        <div class="label">入力欄（1回目・2回目共通）</div>
-        <input
-          id="scanInput"
-          type="text"
-          inputmode="latin"
-          autocomplete="off"
-          autocapitalize="characters"
-          spellcheck="false"
-          placeholder="ここにバーコードリーダーで入力"
-        />
-      </div>
-    </div>
+<div class="card">
 
-    <div id="statusCard" class="status-card state-blue">
-      <div class="status-top">
-        <div class="status-title">状態 / 判定</div>
-        <span id="stateBadge" class="badge">1回目待受</span>
-      </div>
+<button id="btnFocus">入力欄へフォーカス</button>
+<button id="btnReset">最初に戻す</button>
 
-      <div id="resultText" class="result-main">現品票を読み込んで Enter を押してください</div>
-      <div id="resultSubText" class="result-sub">1回目待機中です</div>
+<input
+id="scanInput"
+type="text"
+inputmode="latin"
+autocomplete="off"
+autocapitalize="characters"
+spellcheck="false"
+/>
 
-      <div class="mini-grid">
-        <div class="mini-item">
-          <div class="mini-label">1回目 現品票 生データ</div>
-          <div id="firstRawView" class="mini-value">—</div>
-        </div>
+</div>
 
-        <div class="mini-item">
-          <div class="mini-label">1回目 抽出結果</div>
-          <div id="firstParsedView" class="mini-value">—</div>
-        </div>
+<div id="statusCard" class="status blue">
+1回目待機
+</div>
 
-        <div class="mini-item">
-          <div class="mini-label">2回目 品番ラベル</div>
-          <div id="secondCodeView" class="mini-value">—</div>
-        </div>
-      </div>
-    </div>
+<div class="card">
+<div>1回目データ</div>
+<div id="firstParsed">-</div>
 
-    <div class="card">
-      <div class="label">ログ</div>
-      <div id="log" class="log">log: ready</div>
-    </div>
+<div>2回目データ</div>
+<div id="secondParsed">-</div>
+</div>
 
-    <div class="footer-note">
-      不一致時は作業を中断し、現物・現品票・ラベルを再確認してください。
-    </div>
-  </main>
+<div class="card">
+<div>ログ</div>
+<div id="log" class="log">ready</div>
+</div>
 
-  <script>
-    const scanInput = document.getElementById('scanInput');
-    const btnFocus = document.getElementById('btnFocus');
-    const btnReset = document.getElementById('btnReset');
+</main>
 
-    const statusCard = document.getElementById('statusCard');
-    const stateBadge = document.getElementById('stateBadge');
+<script>
 
-    const firstRawView = document.getElementById('firstRawView');
-    const firstParsedView = document.getElementById('firstParsedView');
-    const secondCodeView = document.getElementById('secondCodeView');
+const scanInput=document.getElementById("scanInput")
+const statusCard=document.getElementById("statusCard")
+const firstParsed=document.getElementById("firstParsed")
+const secondParsed=document.getElementById("secondParsed")
+const log=document.getElementById("log")
 
-    const resultText = document.getElementById('resultText');
-    const resultSubText = document.getElementById('resultSubText');
+let stage=1
+let firstCode=""
+let firstQty=""
 
-    const logEl = document.getElementById('log');
+function addLog(t){
 
-    let stage = 1;
-    let firstData = {
-      raw: "",
-      code: "",
-      qty: ""
-    };
+const d=new Date()
+const ts=d.toLocaleTimeString()
 
-    function addLog(msg) {
-      const now = new Date();
-      const hh = String(now.getHours()).padStart(2, '0');
-      const mm = String(now.getMinutes()).padStart(2, '0');
-      const ss = String(now.getSeconds()).padStart(2, '0');
-      logEl.textContent += `\n[${hh}:${mm}:${ss}] ${msg}`;
-      logEl.scrollTop = logEl.scrollHeight;
-    }
+log.textContent+=`\n${ts} ${t}`
+log.scrollTop=log.scrollHeight
+}
 
-    function clearLog() {
-      logEl.textContent = "log: ready";
-    }
+function normalizeText(str){
 
-    function setCardState(mode, badgeText, mainText, subText) {
-      statusCard.className = "status-card " + mode;
-      stateBadge.textContent = badgeText;
-      resultText.textContent = mainText;
-      resultSubText.textContent = subText || "";
-    }
+return String(str)
 
-    function beep(freq = 880, ms = 120) {
-      try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.frequency.value = freq;
-        osc.type = "sine";
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.01);
-        osc.start();
-        setTimeout(() => {
-          gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.02);
-          osc.stop(ctx.currentTime + 0.03);
-          ctx.close();
-        }, ms);
-      } catch (e) {}
-    }
+.replace(/\r/g,"")
+.replace(/\n/g,"")
 
-    function normalizeText(str) {
-      return String(str || "")
-        .replace(/\r/g, "")
-        .replace(/\n/g, "")
-        .trim()
-        .toUpperCase();
-    }
+.replace(/\.+/g," ")       // ← . を空白に変換
+.replace(/\s+/g," ")       // ← 空白整理
 
-    function normalizeCode(str) {
-      return normalizeText(str).replace(/\s+/g, "");
-    }
+.trim()
+.toUpperCase()
+}
 
-    function isValidCode(code) {
-      return /^[A-Z0-9]{10,12}$/.test(code);
-    }
+function parseFirst(raw){
 
-    function parseFirstLabel(raw) {
-      const text = normalizeText(raw);
-      const match = text.match(/^([A-Z0-9]{10,12})\s+([0-9]+)$/);
+const txt=normalizeText(raw)
 
-      if (!match) {
-        return {
-          ok: false,
-          raw: text,
-          code: "",
-          qty: ""
-        };
-      }
+const m=txt.match(/^([A-Z0-9]{10,12})\s+([0-9]+)$/)
 
-      return {
-        ok: true,
-        raw: text,
-        code: match[1],
-        qty: match[2]
-      };
-    }
+if(!m){
+return null
+}
 
-    function parseSecondLabel(raw) {
-      const code = normalizeCode(raw);
+return{
+code:m[1],
+qty:m[2]
+}
+}
 
-      if (!isValidCode(code)) {
-        return {
-          ok: false,
-          code: ""
-        };
-      }
+function parseSecond(raw){
 
-      return {
-        ok: true,
-        code
-      };
-    }
+const txt=normalizeText(raw)
 
-    function resetAll() {
-      stage = 1;
-      firstData = { raw: "", code: "", qty: "" };
+if(!/^[A-Z0-9]{10,12}$/.test(txt)){
+return null
+}
 
-      scanInput.value = "";
-      firstRawView.textContent = "—";
-      firstParsedView.textContent = "—";
-      secondCodeView.textContent = "—";
+return txt
+}
 
-      setCardState(
-        "state-blue",
-        "1回目待受",
-        "現品票を読み込んで Enter を押してください",
-        "1回目待機中です"
-      );
+function reset(){
 
-      clearLog();
-      addLog("reset complete");
-      scanInput.focus();
-    }
+stage=1
+firstCode=""
+firstQty=""
 
-    function acceptFirstScan() {
-      const raw = scanInput.value;
-      const parsed = parseFirstLabel(raw);
+scanInput.value=""
+firstParsed.textContent="-"
+secondParsed.textContent="-"
 
-      firstRawView.textContent = normalizeText(raw) || "—";
+statusCard.className="status blue"
+statusCard.textContent="1回目待機"
 
-      if (!parsed.ok) {
-        firstParsedView.textContent = "抽出失敗";
-        secondCodeView.textContent = "—";
+addLog("reset")
 
-        setCardState(
-          "state-red",
-          "1回目エラー",
-          "1回目 読取エラー",
-          "形式は「10〜12桁英数字 + 空白 + 数量」です"
-        );
+scanInput.focus()
+}
 
-        addLog("1回目形式エラー: " + normalizeText(raw));
-        beep(220, 220);
-        setTimeout(() => beep(220, 220), 260);
-        scanInput.focus();
-        scanInput.select();
-        return;
-      }
+function firstScan(){
 
-      firstData = {
-        raw: parsed.raw,
-        code: parsed.code,
-        qty: parsed.qty
-      };
+const raw=scanInput.value
 
-      firstParsedView.textContent = `品番: ${parsed.code} / 数量: ${parsed.qty}`;
+const parsed=parseFirst(raw)
 
-      setCardState(
-        "state-blue",
-        "2回目待受",
-        "1回目 読取OK",
-        "2回目で品番ラベルを読み込んで Enter を押してください"
-      );
+if(!parsed){
 
-      addLog(`1回目確定: 品番=${parsed.code} / 数量=${parsed.qty}`);
+statusCard.className="status red"
+statusCard.textContent="1回目エラー"
 
-      stage = 2;
-      scanInput.value = "";
-      scanInput.focus();
-      beep(660, 100);
-    }
+addLog("1回目形式エラー")
 
-    function judgeSecondScan() {
-      const raw = scanInput.value;
-      const parsed = parseSecondLabel(raw);
+scanInput.select()
+return
+}
 
-      secondCodeView.textContent = normalizeCode(raw) || "—";
+firstCode=parsed.code
+firstQty=parsed.qty
 
-      if (!parsed.ok) {
-        setCardState(
-          "state-red",
-          "2回目エラー",
-          "2回目 読取エラー",
-          "品番ラベルは10〜12桁の英数字です"
-        );
+firstParsed.textContent=`${firstCode} / ${firstQty}`
 
-        addLog("2回目形式エラー: " + normalizeText(raw));
-        beep(220, 220);
-        setTimeout(() => beep(220, 220), 260);
-        scanInput.focus();
-        scanInput.select();
-        return;
-      }
+statusCard.className="status blue"
+statusCard.textContent="2回目待機"
 
-      if (parsed.code === firstData.code) {
-        setCardState(
-          "state-green",
-          "一致",
-          "正解",
-          `一致：${parsed.code} / 数量：${firstData.qty}`
-        );
+scanInput.value=""
+stage=2
 
-        addLog(`突合結果: 正解 / 1回目=${firstData.code} / 2回目=${parsed.code} / 数量=${firstData.qty}`);
-        beep(1040, 150);
-      } else {
-        setCardState(
-          "state-red",
-          "不一致",
-          "不一致",
-          `1回目：${firstData.code} / 2回目：${parsed.code} / 数量：${firstData.qty}`
-        );
+addLog("1回目OK")
+}
 
-        addLog(`突合結果: 不一致 / 1回目=${firstData.code} / 2回目=${parsed.code} / 数量=${firstData.qty}`);
-        beep(220, 220);
-        setTimeout(() => beep(220, 220), 260);
-      }
+function secondScan(){
 
-      stage = 3;
-      scanInput.blur();
-    }
+const raw=scanInput.value
 
-    function handleScan() {
-      if (stage === 1) {
-        acceptFirstScan();
-      } else if (stage === 2) {
-        judgeSecondScan();
-      } else {
-        addLog("判定後停止中: 最初に戻す を押してください");
-      }
-    }
+const code=parseSecond(raw)
 
-    scanInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        handleScan();
-      }
-    });
+if(!code){
 
-    btnFocus.addEventListener("click", () => {
-      if (stage !== 3) {
-        scanInput.focus();
-        addLog("input focused");
-      } else {
-        addLog("判定後停止中のため、最初に戻す待機");
-      }
-    });
+statusCard.className="status red"
+statusCard.textContent="2回目エラー"
 
-    btnReset.addEventListener("click", resetAll);
+addLog("2回目形式エラー")
 
-    document.addEventListener("click", (e) => {
-      const tag = e.target.tagName;
-      if (tag === "INPUT" || tag === "BUTTON" || tag === "SUMMARY") return;
-      if (stage !== 3) {
-        scanInput.focus();
-      }
-    });
+scanInput.select()
+return
+}
 
-    resetAll();
+secondParsed.textContent=code
 
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', async () => {
-        try {
-          await navigator.serviceWorker.register('./service-worker.js');
-          console.log('Service Worker registered');
-        } catch (err) {
-          console.error('Service Worker registration failed:', err);
-        }
-      });
-    }
-  </script>
+if(code===firstCode){
+
+statusCard.className="status green"
+statusCard.textContent="一致"
+
+addLog("一致")
+
+}else{
+
+statusCard.className="status red"
+statusCard.textContent="不一致"
+
+addLog("不一致")
+}
+
+stage=3
+scanInput.blur()
+}
+
+scanInput.addEventListener("keydown",(e)=>{
+
+if(e.key==="Enter"){
+
+e.preventDefault()
+
+if(stage===1){
+firstScan()
+}
+else if(stage===2){
+secondScan()
+}
+
+}
+
+})
+
+document.getElementById("btnReset").onclick=reset
+document.getElementById("btnFocus").onclick=()=>scanInput.focus()
+
+reset()
+
+</script>
+
 </body>
 </html>
