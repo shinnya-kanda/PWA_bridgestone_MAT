@@ -1,286 +1,963 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>現品票・品番ラベル 突合</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>現品票・品番ラベル 突合</title>
 
-<style>
-body{
-font-family:sans-serif;
-background:#eef2f7;
-margin:0;
-}
+  <meta name="theme-color" content="#111827" />
+  <meta name="description" content="現品票と品番ラベルの突合を行うPWAアプリ" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="現品票突合" />
 
-header{
-background:#111827;
-color:white;
-text-align:center;
-padding:10px;
-font-weight:bold;
-}
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
 
-main{
-max-width:520px;
-margin:auto;
-padding:10px;
-}
+  <style>
+    :root{
+      --bg:#eef2f7;
+      --card:#ffffff;
+      --text:#111827;
+      --muted:#6b7280;
+      --border:#dbe2ea;
 
-.card{
-background:white;
-padding:10px;
-border-radius:10px;
-margin-bottom:10px;
-}
+      --blue-bg:#dbeafe;
+      --blue-border:#60a5fa;
+      --blue-text:#1e3a8a;
 
-button{
-width:100%;
-padding:12px;
-margin-top:6px;
-font-size:16px;
-}
+      --green-bg:#dcfce7;
+      --green-border:#22c55e;
+      --green-text:#166534;
 
-input{
-width:100%;
-padding:12px;
-font-size:20px;
-}
+      --red-bg:#fee2e2;
+      --red-border:#ef4444;
+      --red-text:#991b1b;
 
-.status{
-padding:10px;
-font-size:26px;
-font-weight:bold;
-text-align:center;
-}
+      --amber-bg:#fef3c7;
+      --amber-border:#f59e0b;
+      --amber-text:#92400e;
+    }
 
-.blue{background:#dbeafe;}
-.green{background:#dcfce7;}
-.red{background:#fee2e2;}
+    * { box-sizing: border-box; }
 
-.log{
-background:black;
-color:#eee;
-padding:10px;
-height:120px;
-overflow:auto;
-font-size:12px;
-}
-</style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", sans-serif;
+    }
+
+    body {
+      min-height: 100dvh;
+    }
+
+    header {
+      padding: 10px 12px;
+      background: #111827;
+      color: #fff;
+      font-weight: 800;
+      font-size: 16px;
+      line-height: 1.4;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    main {
+      max-width: 520px;
+      margin: 0 auto;
+      padding: 10px 10px 14px;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 14px;
+      padding: 10px;
+      box-shadow: 0 6px 18px rgba(0,0,0,.06);
+      margin-bottom: 10px;
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .row > * {
+      flex: 1;
+    }
+
+    button {
+      width: 100%;
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 10px;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+      background: #111827;
+      color: #fff;
+      min-height: 48px;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    button.danger { background: #b91c1c; }
+    button.subtle { background: #475569; }
+
+    details {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #f9fafb;
+      overflow: hidden;
+    }
+
+    summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 12px 14px;
+      font-weight: 800;
+      font-size: 14px;
+      user-select: none;
+      position: relative;
+    }
+
+    summary::-webkit-details-marker { display: none; }
+
+    summary::after {
+      content: "＋";
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 18px;
+      font-weight: 900;
+      color: #374151;
+    }
+
+    details[open] summary::after {
+      content: "－";
+    }
+
+    .hint-body {
+      padding: 0 14px 12px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.65;
+      border-top: 1px solid var(--border);
+      background: #fff;
+    }
+
+    .field {
+      margin-top: 8px;
+    }
+
+    .label {
+      font-size: 12px;
+      font-weight: 800;
+      color: #374151;
+      margin-bottom: 5px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 14px 12px;
+      border: 2px solid #cfd8e3;
+      border-radius: 12px;
+      font-size: 18px;
+      font-weight: 700;
+      background: #fff;
+      min-height: 52px;
+    }
+
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #111827;
+      box-shadow: 0 0 0 4px rgba(17,24,39,.08);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 34px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 900;
+      background: rgba(255,255,255,.7);
+      color: #111827;
+      border: 1px solid rgba(255,255,255,.7);
+      backdrop-filter: blur(2px);
+    }
+
+    .status-card {
+      border-radius: 16px;
+      padding: 12px;
+      border: 2px solid var(--blue-border);
+      background: var(--blue-bg);
+      color: var(--blue-text);
+      transition: .2s ease;
+    }
+
+    .status-card.state-blue {
+      background: var(--blue-bg);
+      border-color: var(--blue-border);
+      color: var(--blue-text);
+    }
+
+    .status-card.state-green {
+      background: var(--green-bg);
+      border-color: var(--green-border);
+      color: var(--green-text);
+    }
+
+    .status-card.state-red {
+      background: var(--red-bg);
+      border-color: var(--red-border);
+      color: var(--red-text);
+    }
+
+    .status-card.state-amber {
+      background: var(--amber-bg);
+      border-color: var(--amber-border);
+      color: var(--amber-text);
+    }
+
+    .status-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .status-title {
+      font-size: 13px;
+      font-weight: 900;
+      opacity: .9;
+    }
+
+    .result-main {
+      font-size: 30px;
+      font-weight: 1000;
+      line-height: 1.15;
+      letter-spacing: .02em;
+      margin-top: 4px;
+    }
+
+    .result-sub {
+      margin-top: 6px;
+      font-size: 15px;
+      font-weight: 800;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+
+    .mini-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .mini-item {
+      background: rgba(255,255,255,.55);
+      border: 1px solid rgba(255,255,255,.7);
+      border-radius: 12px;
+      padding: 8px 10px;
+    }
+
+    .mini-item .mini-label {
+      font-size: 11px;
+      font-weight: 900;
+      opacity: .85;
+      margin-bottom: 4px;
+    }
+
+    .mini-item .mini-value {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 14px;
+      font-weight: 800;
+      word-break: break-all;
+      line-height: 1.4;
+    }
+
+    .counter-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .counter-item {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .counter-label {
+      font-size: 11px;
+      font-weight: 900;
+      color: #475569;
+      margin-bottom: 4px;
+    }
+
+    .counter-value {
+      font-size: 22px;
+      font-weight: 1000;
+      line-height: 1.1;
+    }
+
+    .log {
+      background: #111827;
+      color: #e5e7eb;
+      border-radius: 12px;
+      padding: 10px;
+      white-space: pre-wrap;
+      font-size: 12px;
+      line-height: 1.45;
+      min-height: 140px;
+      max-height: 220px;
+      overflow: auto;
+    }
+
+    .footer-note {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.5;
+      text-align: center;
+      padding: 4px 6px 0;
+    }
+
+    @media (max-width: 430px) {
+      .result-main {
+        font-size: 26px;
+      }
+      .result-sub {
+        font-size: 14px;
+      }
+      input[type="text"] {
+        font-size: 17px;
+      }
+      button {
+        font-size: 14px;
+      }
+    }
+  </style>
 </head>
-
 <body>
-
-<header>現品票・品番ラベル 突合</header>
-
-<main>
-
-<div class="card">
-
-<button id="btnFocus">入力欄へフォーカス</button>
-<button id="btnReset">最初に戻す</button>
-
-<input
-id="scanInput"
-type="text"
-inputmode="latin"
-autocomplete="off"
-autocapitalize="characters"
-spellcheck="false"
-/>
-
-</div>
-
-<div id="statusCard" class="status blue">
-1回目待機
-</div>
-
-<div class="card">
-<div>1回目データ</div>
-<div id="firstParsed">-</div>
-
-<div>2回目データ</div>
-<div id="secondParsed">-</div>
-</div>
-
-<div class="card">
-<div>ログ</div>
-<div id="log" class="log">ready</div>
-</div>
-
-</main>
-
-<script>
-
-const scanInput=document.getElementById("scanInput")
-const statusCard=document.getElementById("statusCard")
-const firstParsed=document.getElementById("firstParsed")
-const secondParsed=document.getElementById("secondParsed")
-const log=document.getElementById("log")
-
-let stage=1
-let firstCode=""
-let firstQty=""
-
-function addLog(t){
-
-const d=new Date()
-const ts=d.toLocaleTimeString()
-
-log.textContent+=`\n${ts} ${t}`
-log.scrollTop=log.scrollHeight
-}
-
-function normalizeText(str){
-
-return String(str)
-
-.replace(/\r/g,"")
-.replace(/\n/g,"")
-
-.replace(/\.+/g," ")       // ← . を空白に変換
-.replace(/\s+/g," ")       // ← 空白整理
-
-.trim()
-.toUpperCase()
-}
-
-function parseFirst(raw){
-
-const txt=normalizeText(raw)
-
-const m=txt.match(/^([A-Z0-9]{10,12})\s+([0-9]+)$/)
-
-if(!m){
-return null
-}
-
-return{
-code:m[1],
-qty:m[2]
-}
-}
-
-function parseSecond(raw){
-
-const txt=normalizeText(raw)
-
-if(!/^[A-Z0-9]{10,12}$/.test(txt)){
-return null
-}
-
-return txt
-}
-
-function reset(){
-
-stage=1
-firstCode=""
-firstQty=""
-
-scanInput.value=""
-firstParsed.textContent="-"
-secondParsed.textContent="-"
-
-statusCard.className="status blue"
-statusCard.textContent="1回目待機"
-
-addLog("reset")
-
-scanInput.focus()
-}
-
-function firstScan(){
-
-const raw=scanInput.value
-
-const parsed=parseFirst(raw)
-
-if(!parsed){
-
-statusCard.className="status red"
-statusCard.textContent="1回目エラー"
-
-addLog("1回目形式エラー")
-
-scanInput.select()
-return
-}
-
-firstCode=parsed.code
-firstQty=parsed.qty
-
-firstParsed.textContent=`${firstCode} / ${firstQty}`
-
-statusCard.className="status blue"
-statusCard.textContent="2回目待機"
-
-scanInput.value=""
-stage=2
-
-addLog("1回目OK")
-}
-
-function secondScan(){
-
-const raw=scanInput.value
-
-const code=parseSecond(raw)
-
-if(!code){
-
-statusCard.className="status red"
-statusCard.textContent="2回目エラー"
-
-addLog("2回目形式エラー")
-
-scanInput.select()
-return
-}
-
-secondParsed.textContent=code
-
-if(code===firstCode){
-
-statusCard.className="status green"
-statusCard.textContent="一致"
-
-addLog("一致")
-
-}else{
-
-statusCard.className="status red"
-statusCard.textContent="不一致"
-
-addLog("不一致")
-}
-
-stage=3
-scanInput.blur()
-}
-
-scanInput.addEventListener("keydown",(e)=>{
-
-if(e.key==="Enter"){
-
-e.preventDefault()
-
-if(stage===1){
-firstScan()
-}
-else if(stage===2){
-secondScan()
-}
-
-}
-
-})
-
-document.getElementById("btnReset").onclick=reset
-document.getElementById("btnFocus").onclick=()=>scanInput.focus()
-
-reset()
-
-</script>
-
+  <header>現品票・品番ラベル 突合</header>
+
+  <main>
+    <div class="card">
+      <div class="row">
+        <button id="btnFocus">入力欄へフォーカス</button>
+        <button id="btnReset" class="danger">最初に戻す</button>
+      </div>
+
+      <div class="field">
+        <details>
+          <summary>使用方法を表示</summary>
+          <div class="hint-body">
+            ① 1回目で現品票を読む（10〜12桁英数字 + 空白 + 数量）<br>
+            ② Enter押下で1回目を確定し、2回目待受へ移行<br>
+            ③ 2回目で品番ラベルを読む（10〜12桁英数字）<br>
+            ④ Enter押下で一致 / 不一致を判定<br>
+            ⑤ 判定後は停止し、「最初に戻す」で次へ進む<br>
+            ※ 「.」は空白として補正します<br>
+            ※ BluetoothバーコードリーダーがEnterを送信する設定なら、そのまま確定できます
+          </div>
+        </details>
+      </div>
+
+      <div class="field">
+        <div class="label">入力欄（1回目・2回目共通）</div>
+        <input
+          id="scanInput"
+          type="text"
+          inputmode="latin"
+          autocomplete="off"
+          autocapitalize="characters"
+          spellcheck="false"
+          enterkeyhint="done"
+          placeholder="ここにバーコードリーダーで入力"
+        />
+      </div>
+    </div>
+
+    <div id="statusCard" class="status-card state-blue">
+      <div class="status-top">
+        <div class="status-title">状態 / 判定</div>
+        <span id="stateBadge" class="badge">1回目待受</span>
+      </div>
+
+      <div id="resultText" class="result-main">現品票を読み込んで Enter を押してください</div>
+      <div id="resultSubText" class="result-sub">1回目待機中です</div>
+
+      <div class="mini-grid">
+        <div class="mini-item">
+          <div class="mini-label">1回目 現品票 生データ</div>
+          <div id="firstRawView" class="mini-value">—</div>
+        </div>
+
+        <div class="mini-item">
+          <div class="mini-label">1回目 抽出結果</div>
+          <div id="firstParsedView" class="mini-value">—</div>
+        </div>
+
+        <div class="mini-item">
+          <div class="mini-label">2回目 品番ラベル</div>
+          <div id="secondCodeView" class="mini-value">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">本日カウンター</div>
+      <div class="counter-grid">
+        <div class="counter-item">
+          <div class="counter-label">総判定数</div>
+          <div id="countTotal" class="counter-value">0</div>
+        </div>
+        <div class="counter-item">
+          <div class="counter-label">一致</div>
+          <div id="countMatch" class="counter-value">0</div>
+        </div>
+        <div class="counter-item">
+          <div class="counter-label">不一致</div>
+          <div id="countMismatch" class="counter-value">0</div>
+        </div>
+        <div class="counter-item">
+          <div class="counter-label">読取エラー</div>
+          <div id="countError" class="counter-value">0</div>
+        </div>
+      </div>
+      <div class="field">
+        <button id="btnClearCounts" class="subtle">件数・ログをクリア</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">ログ</div>
+      <div id="log" class="log">log: ready</div>
+    </div>
+
+    <div class="footer-note">
+      不一致時は作業を中断し、現物・現品票・ラベルを再確認してください。
+    </div>
+  </main>
+
+  <script>
+    const scanInput = document.getElementById('scanInput');
+    const btnFocus = document.getElementById('btnFocus');
+    const btnReset = document.getElementById('btnReset');
+    const btnClearCounts = document.getElementById('btnClearCounts');
+
+    const statusCard = document.getElementById('statusCard');
+    const stateBadge = document.getElementById('stateBadge');
+
+    const firstRawView = document.getElementById('firstRawView');
+    const firstParsedView = document.getElementById('firstParsedView');
+    const secondCodeView = document.getElementById('secondCodeView');
+
+    const resultText = document.getElementById('resultText');
+    const resultSubText = document.getElementById('resultSubText');
+
+    const logEl = document.getElementById('log');
+
+    const countTotalEl = document.getElementById('countTotal');
+    const countMatchEl = document.getElementById('countMatch');
+    const countMismatchEl = document.getElementById('countMismatch');
+    const countErrorEl = document.getElementById('countError');
+
+    const STORAGE_KEY = 'scan_match_app_v2';
+    const LOG_LIMIT = 150;
+
+    // Supabase を使う場合だけ値を入れてください。未設定なら自動で無効です。
+    const SUPABASE_URL = '';
+    const SUPABASE_ANON_KEY = '';
+    const SUPABASE_TABLE = 'scan_logs';
+
+    let stage = 1; // 1:1回目待受 2:2回目待受 3:判定後停止
+    let firstData = { raw: '', code: '', qty: '' };
+    let isHandling = false;
+
+    let appState = {
+      counts: {
+        total: 0,
+        match: 0,
+        mismatch: 0,
+        error: 0
+      },
+      logs: ['log: ready']
+    };
+
+    function nowStamp() {
+      const now = new Date();
+      const yy = now.getFullYear();
+      const mo = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      const ss = String(now.getSeconds()).padStart(2, '0');
+      return `${yy}-${mo}-${dd} ${hh}:${mm}:${ss}`;
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+      } catch (e) {}
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          if (parsed.counts) {
+            appState.counts.total = Number(parsed.counts.total || 0);
+            appState.counts.match = Number(parsed.counts.match || 0);
+            appState.counts.mismatch = Number(parsed.counts.mismatch || 0);
+            appState.counts.error = Number(parsed.counts.error || 0);
+          }
+          if (Array.isArray(parsed.logs) && parsed.logs.length) {
+            appState.logs = parsed.logs.slice(-LOG_LIMIT);
+          }
+        }
+      } catch (e) {}
+    }
+
+    function renderCounts() {
+      countTotalEl.textContent = String(appState.counts.total);
+      countMatchEl.textContent = String(appState.counts.match);
+      countMismatchEl.textContent = String(appState.counts.mismatch);
+      countErrorEl.textContent = String(appState.counts.error);
+    }
+
+    function renderLogs() {
+      logEl.textContent = appState.logs.join('\n');
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function addLog(msg) {
+      appState.logs.push(`[${nowStamp()}] ${msg}`);
+      if (appState.logs.length > LOG_LIMIT) {
+        appState.logs = appState.logs.slice(-LOG_LIMIT);
+      }
+      renderLogs();
+      saveState();
+    }
+
+    function clearLog() {
+      appState.logs = ['log: ready'];
+      renderLogs();
+      saveState();
+    }
+
+    function incrementCount(type) {
+      if (type === 'match') {
+        appState.counts.total += 1;
+        appState.counts.match += 1;
+      } else if (type === 'mismatch') {
+        appState.counts.total += 1;
+        appState.counts.mismatch += 1;
+      } else if (type === 'error') {
+        appState.counts.error += 1;
+      }
+      renderCounts();
+      saveState();
+    }
+
+    function clearCountsAndLogs() {
+      appState.counts = { total: 0, match: 0, mismatch: 0, error: 0 };
+      appState.logs = ['log: ready'];
+      renderCounts();
+      renderLogs();
+      saveState();
+      addLog('counts/logs cleared');
+    }
+
+    function setCardState(mode, badgeText, mainText, subText) {
+      statusCard.className = 'status-card ' + mode;
+      stateBadge.textContent = badgeText;
+      resultText.textContent = mainText;
+      resultSubText.textContent = subText || '';
+    }
+
+    function vibrate(pattern) {
+      try {
+        if (navigator.vibrate) {
+          navigator.vibrate(pattern);
+        }
+      } catch (e) {}
+    }
+
+    function beep(freq = 880, ms = 120) {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = freq;
+        osc.type = 'sine';
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.01);
+        osc.start();
+        setTimeout(() => {
+          gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.02);
+          osc.stop(ctx.currentTime + 0.03);
+          ctx.close();
+        }, ms);
+      } catch (e) {}
+    }
+
+    function signalOk() {
+      beep(1040, 140);
+      vibrate(80);
+    }
+
+    function signalInfo() {
+      beep(660, 90);
+      vibrate(40);
+    }
+
+    function signalError() {
+      beep(220, 220);
+      setTimeout(() => beep(220, 220), 260);
+      vibrate([100, 70, 100]);
+    }
+
+    function normalizeText(str) {
+      return String(str || '')
+        .replace(/\r/g, '')
+        .replace(/\n/g, '')
+        .replace(/　/g, ' ')
+        .replace(/\./g, ' ')
+        .replace(/。/g, ' ')
+        .replace(/[‐-‒–—―ー]/g, '-')
+        .replace(/[^\x20-\x7EＡ-Ｚａ-ｚ０-９ ]/g, ' ')
+        .replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s) =>
+          String.fromCharCode(s.charCodeAt(0) - 0xFEE0)
+        )
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toUpperCase();
+    }
+
+    function normalizeCode(str) {
+      return normalizeText(str)
+        .replace(/\s+/g, '')
+        .replace(/\./g, '')
+        .replace(/-/g, '');
+    }
+
+    function isValidCode(code) {
+      return /^[A-Z0-9]{10,12}$/.test(code);
+    }
+
+    function parseFirstLabel(raw) {
+      const text = normalizeText(raw);
+      const match = text.match(/^([A-Z0-9]{10,12})\s+([0-9]+)$/);
+
+      if (!match) {
+        return {
+          ok: false,
+          raw: text,
+          code: '',
+          qty: ''
+        };
+      }
+
+      return {
+        ok: true,
+        raw: text,
+        code: match[1],
+        qty: match[2]
+      };
+    }
+
+    function parseSecondLabel(raw) {
+      const code = normalizeCode(raw);
+
+      if (!isValidCode(code)) {
+        return {
+          ok: false,
+          code: ''
+        };
+      }
+
+      return {
+        ok: true,
+        code
+      };
+    }
+
+    async function postToSupabase(payload) {
+      if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_TABLE) return;
+
+      try {
+        await fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify(payload)
+        });
+      } catch (e) {
+        addLog('Supabase送信失敗');
+      }
+    }
+
+    function focusInput(select = false) {
+      setTimeout(() => {
+        scanInput.focus();
+        if (select) {
+          try { scanInput.select(); } catch (e) {}
+        }
+      }, 30);
+    }
+
+    function resetAll() {
+      stage = 1;
+      firstData = { raw: '', code: '', qty: '' };
+      isHandling = false;
+
+      scanInput.value = '';
+      firstRawView.textContent = '—';
+      firstParsedView.textContent = '—';
+      secondCodeView.textContent = '—';
+
+      setCardState(
+        'state-blue',
+        '1回目待受',
+        '現品票を読み込んで Enter を押してください',
+        '1回目待機中です'
+      );
+
+      addLog('reset complete');
+      focusInput();
+    }
+
+    async function acceptFirstScan() {
+      const raw = scanInput.value;
+      const parsed = parseFirstLabel(raw);
+
+      firstRawView.textContent = normalizeText(raw) || '—';
+
+      if (!parsed.ok) {
+        firstParsedView.textContent = '抽出失敗';
+        secondCodeView.textContent = '—';
+
+        setCardState(
+          'state-red',
+          '1回目エラー',
+          '1回目 読取エラー',
+          '形式は「10〜12桁英数字 + 空白 + 数量」です'
+        );
+
+        addLog('1回目形式エラー: ' + normalizeText(raw));
+        incrementCount('error');
+        signalError();
+        focusInput(true);
+        return;
+      }
+
+      firstData = {
+        raw: parsed.raw,
+        code: parsed.code,
+        qty: parsed.qty
+      };
+
+      firstParsedView.textContent = `品番: ${parsed.code} / 数量: ${parsed.qty}`;
+
+      setCardState(
+        'state-blue',
+        '2回目待受',
+        '1回目 読取OK',
+        '2回目で品番ラベルを読み込んで Enter を押してください'
+      );
+
+      addLog(`1回目確定: 品番=${parsed.code} / 数量=${parsed.qty}`);
+
+      stage = 2;
+      scanInput.value = '';
+      signalInfo();
+      focusInput();
+    }
+
+    async function judgeSecondScan() {
+      const raw = scanInput.value;
+      const parsed = parseSecondLabel(raw);
+
+      secondCodeView.textContent = normalizeCode(raw) || '—';
+
+      if (!parsed.ok) {
+        setCardState(
+          'state-red',
+          '2回目エラー',
+          '2回目 読取エラー',
+          '品番ラベルは10〜12桁の英数字です'
+        );
+
+        addLog('2回目形式エラー: ' + normalizeText(raw));
+        incrementCount('error');
+        signalError();
+        focusInput(true);
+        return;
+      }
+
+      const payloadBase = {
+        scanned_at: new Date().toISOString(),
+        first_raw: firstData.raw,
+        first_code: firstData.code,
+        first_qty: firstData.qty,
+        second_code: parsed.code
+      };
+
+      if (parsed.code === firstData.code) {
+        setCardState(
+          'state-green',
+          '一致',
+          '正解',
+          `一致：${parsed.code} / 数量：${firstData.qty}`
+        );
+
+        addLog(`突合結果: 正解 / 1回目=${firstData.code} / 2回目=${parsed.code} / 数量=${firstData.qty}`);
+        incrementCount('match');
+        signalOk();
+
+        await postToSupabase({
+          ...payloadBase,
+          result: 'match'
+        });
+      } else {
+        setCardState(
+          'state-red',
+          '不一致',
+          '不一致',
+          `1回目：${firstData.code} / 2回目：${parsed.code} / 数量：${firstData.qty}`
+        );
+
+        addLog(`突合結果: 不一致 / 1回目=${firstData.code} / 2回目=${parsed.code} / 数量=${firstData.qty}`);
+        incrementCount('mismatch');
+        signalError();
+
+        await postToSupabase({
+          ...payloadBase,
+          result: 'mismatch'
+        });
+      }
+
+      stage = 3;
+      scanInput.blur();
+    }
+
+    async function handleScan() {
+      if (isHandling) return;
+      isHandling = true;
+
+      try {
+        if (stage === 1) {
+          await acceptFirstScan();
+        } else if (stage === 2) {
+          await judgeSecondScan();
+        } else {
+          addLog('判定後停止中: 最初に戻す を押してください');
+          setCardState(
+            'state-amber',
+            '停止中',
+            '判定後停止中',
+            '次の作業は「最初に戻す」を押してください'
+          );
+          signalInfo();
+        }
+      } finally {
+        setTimeout(() => {
+          isHandling = false;
+        }, 120);
+      }
+    }
+
+    scanInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleScan();
+      }
+    });
+
+    scanInput.addEventListener('input', () => {
+      // IME混入や不要文字の揺れを軽く吸収
+      const current = scanInput.value;
+      if (/[。　]/.test(current) || /\.\./.test(current)) {
+        scanInput.value = normalizeText(current);
+      }
+    });
+
+    scanInput.addEventListener('focus', () => {
+      scanInput.setAttribute('autocorrect', 'off');
+      scanInput.setAttribute('autocapitalize', 'characters');
+    });
+
+    btnFocus.addEventListener('click', () => {
+      if (stage !== 3) {
+        focusInput();
+        addLog('input focused');
+      } else {
+        addLog('判定後停止中のため、最初に戻す待機');
+      }
+    });
+
+    btnReset.addEventListener('click', resetAll);
+    btnClearCounts.addEventListener('click', () => {
+      if (confirm('件数とログをクリアしますか？')) {
+        clearCountsAndLogs();
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      const tag = e.target.tagName;
+      if (tag === 'INPUT' || tag === 'BUTTON' || tag === 'SUMMARY') return;
+      if (stage !== 3) {
+        focusInput();
+      }
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && stage !== 3) {
+        focusInput();
+      }
+    });
+
+    window.addEventListener('pageshow', () => {
+      if (stage !== 3) {
+        focusInput();
+      }
+    });
+
+    loadState();
+    renderCounts();
+    renderLogs();
+    resetAll();
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', async () => {
+        try {
+          await navigator.serviceWorker.register('./service-worker.js');
+          console.log('Service Worker registered');
+        } catch (err) {
+          console.error('Service Worker registration failed:', err);
+          addLog('Service Worker registration failed');
+        }
+      });
+    }
+  </script>
 </body>
 </html>
