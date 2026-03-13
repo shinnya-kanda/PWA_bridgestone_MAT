@@ -349,7 +349,7 @@
       font-size: 12px;
       line-height: 1.45;
       min-height: 140px;
-      max-height: 220px;
+      max-height: 240px;
       overflow: auto;
     }
 
@@ -362,18 +362,10 @@
     }
 
     @media (max-width: 430px) {
-      .result-main {
-        font-size: 26px;
-      }
-      .result-sub {
-        font-size: 14px;
-      }
-      input[type="text"] {
-        font-size: 17px;
-      }
-      button {
-        font-size: 14px;
-      }
+      .result-main { font-size: 26px; }
+      .result-sub { font-size: 14px; }
+      input[type="text"] { font-size: 17px; }
+      button { font-size: 14px; }
     }
   </style>
 </head>
@@ -393,13 +385,12 @@
           <div class="hint-body">
             ① 1回目で現品票を読む（10〜12桁英数字 + 空白 + 数量）<br>
             ② スペースが無くても「品番＋数量」の連続読取に対応<br>
-            ③ Enterが来なくても、1回目成立で自動的に2回目待受へ移行<br>
+            ③ Enterが来なくても、入力停止後に自動確定します<br>
             ④ 2回目で品番ラベルを読む（10〜12桁英数字）<br>
-            ⑤ Enter押下または自動確定で一致 / 不一致を判定<br>
-            ⑥ 判定後は停止し、「最初に戻す」で次へ進む<br>
+            ⑤ 判定後は停止し、「最初に戻す」で次へ進みます<br>
             ※ 全角英数字は自動で半角へ補正します<br>
             ※ 英字は自動で大文字へ補正します<br>
-            ※ 全角スペース / 「.」 / 「。」はスペースとして認識します
+            ※ 全角スペース / 改行 / Tab / 「.」 / 「。」は区切りとして認識します
           </div>
         </details>
       </div>
@@ -508,14 +499,14 @@
     const countMismatchEl = document.getElementById('countMismatch');
     const countErrorEl = document.getElementById('countError');
 
-    const STORAGE_KEY = 'scan_match_app_v5_concat_qty';
+    const STORAGE_KEY = 'scan_match_app_v6_stable';
     const LOG_LIMIT = 150;
 
     const SUPABASE_URL = '';
     const SUPABASE_ANON_KEY = '';
     const SUPABASE_TABLE = 'scan_logs';
 
-    const AUTO_SUBMIT_DELAY_MS = 260;
+    const AUTO_SUBMIT_DELAY_MS = 140;
     const FOCUS_DELAY_MS = 80;
     const FIRST_QTY_MIN = 1;
     const FIRST_QTY_MAX = 6;
@@ -525,6 +516,7 @@
     let isHandling = false;
     let isComposing = false;
     let autoSubmitTimer = null;
+    let programmaticUpdating = false;
     let audioCtx = null;
     let audioUnlocked = false;
 
@@ -628,9 +620,7 @@
 
     function vibrate(pattern) {
       try {
-        if (navigator.vibrate) {
-          navigator.vibrate(pattern);
-        }
+        if (navigator.vibrate) navigator.vibrate(pattern);
       } catch (e) {}
     }
 
@@ -639,13 +629,10 @@
         if (audioUnlocked) return;
         const Ctx = window.AudioContext || window.webkitAudioContext;
         if (!Ctx) return;
-
         audioCtx = audioCtx || new Ctx();
-
         if (audioCtx.state === 'suspended') {
           audioCtx.resume().catch(() => {});
         }
-
         audioUnlocked = true;
       } catch (e) {}
     }
@@ -653,11 +640,9 @@
     function beep(freq = 880, ms = 120) {
       try {
         if (!audioUnlocked || !audioCtx) return;
-
         if (audioCtx.state === 'suspended') {
           audioCtx.resume().catch(() => {});
         }
-
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
 
@@ -700,35 +685,82 @@
 
     function sanitizeForInput(str) {
       return toHalfWidthAlphaNum(String(str || ''))
-        .replace(/\r/g, '')
-        .replace(/\n/g, ' ')
+        .replace(/\r/g, '\n')
         .replace(/　/g, ' ')
         .replace(/[。\.]/g, ' ')
+        .replace(/\t/g, ' ')
         .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]/g, '-')
-        .replace(/[^A-Za-z0-9 \-]/g, '')
+        .replace(/[^A-Za-z0-9 \-\n]/g, '')
         .toUpperCase();
     }
 
     function normalizeText(str) {
       return sanitizeForInput(str)
+        .replace(/\n+/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
     }
 
-    function normalizeCode(str) {
+    function compactAlphaNum(str) {
       return normalizeText(str)
-        .replace(/\s+/g, '')
-        .replace(/-/g, '');
+        .replace(/[^A-Z0-9]/g, '');
+    }
+
+    function normalizeCode(str) {
+      return compactAlphaNum(str).replace(/-/g, '');
     }
 
     function isValidCode(code) {
       return /^[A-Z0-9]{10,12}$/.test(code);
     }
 
+    function findFirstCandidates(compact) {
+      const candidates = [];
+      if (!compact) return candidates;
+
+      for (let start = 0; start < compact.length; start++) {
+        for (let codeLen = 12; codeLen >= 10; codeLen--) {
+          const qtyStart = start + codeLen;
+          if (qtyStart >= compact.length) continue;
+
+          const codePart = compact.slice(start, qtyStart);
+          if (!isValidCode(codePart)) continue;
+
+          for (let qtyLen = FIRST_QTY_MIN; qtyLen <= FIRST_QTY_MAX; qtyLen++) {
+            const end = qtyStart + qtyLen;
+            if (end > compact.length) continue;
+
+            const qtyPart = compact.slice(qtyStart, end);
+            if (!/^[0-9]{1,6}$/.test(qtyPart)) continue;
+
+            const remain = compact.slice(end);
+            if (remain && !/^[0-9A-Z]*$/.test(remain)) continue;
+
+            candidates.push({
+              code: codePart,
+              qty: String(Number(qtyPart)),
+              codeLen,
+              qtyLen,
+              start,
+              end,
+              remain
+            });
+          }
+        }
+      }
+
+      candidates.sort((a, b) => {
+        if (a.start !== b.start) return a.start - b.start;
+        if (b.codeLen !== a.codeLen) return b.codeLen - a.codeLen;
+        return a.qtyLen - b.qtyLen;
+      });
+
+      return candidates;
+    }
+
     function tryParseFirstWithSpace(text) {
       const match = text.match(/^([A-Z0-9]{10,12})\s+([0-9]{1,6})$/);
       if (!match) return null;
-
       return {
         ok: true,
         raw: text,
@@ -738,40 +770,34 @@
       };
     }
 
-    function tryParseFirstWithoutSpace(text) {
-      const compact = text.replace(/\s+/g, '');
-      if (!/^[A-Z0-9]+$/.test(compact)) return null;
+    function tryParseFirstFlexible(raw) {
+      const text = normalizeText(raw);
+      if (!text) return null;
 
-      for (let codeLen = 12; codeLen >= 10; codeLen--) {
-        if (compact.length <= codeLen) continue;
+      const compact = text.replace(/[^A-Z0-9]/g, '');
+      if (!compact) return null;
 
-        const codePart = compact.slice(0, codeLen);
-        const qtyPart = compact.slice(codeLen);
+      const candidates = findFirstCandidates(compact);
+      if (!candidates.length) return null;
 
-        if (!isValidCode(codePart)) continue;
-        if (!/^[0-9]+$/.test(qtyPart)) continue;
-        if (qtyPart.length < FIRST_QTY_MIN || qtyPart.length > FIRST_QTY_MAX) continue;
-
-        return {
-          ok: true,
-          raw: compact,
-          code: codePart,
-          qty: String(Number(qtyPart)),
-          mode: 'concat'
-        };
-      }
-
-      return null;
+      const best = candidates[0];
+      return {
+        ok: true,
+        raw: text,
+        code: best.code,
+        qty: best.qty,
+        mode: text.includes(' ') ? 'space-flex' : 'concat'
+      };
     }
 
     function parseFirstLabel(raw) {
       const text = normalizeText(raw);
 
-      const withSpace = tryParseFirstWithSpace(text);
-      if (withSpace) return withSpace;
+      const strictSpace = tryParseFirstWithSpace(text);
+      if (strictSpace) return strictSpace;
 
-      const withoutSpace = tryParseFirstWithoutSpace(text);
-      if (withoutSpace) return withoutSpace;
+      const flex = tryParseFirstFlexible(raw);
+      if (flex) return flex;
 
       return {
         ok: false,
@@ -783,19 +809,19 @@
     }
 
     function parseSecondLabel(raw) {
-      const code = normalizeCode(raw);
+      const text = normalizeText(raw);
+      const compact = text.replace(/[^A-Z0-9]/g, '');
 
-      if (!isValidCode(code)) {
-        return {
-          ok: false,
-          code: ''
-        };
+      if (isValidCode(compact)) {
+        return { ok: true, code: compact };
       }
 
-      return {
-        ok: true,
-        code
-      };
+      const m = compact.match(/[A-Z0-9]{10,12}/);
+      if (m && isValidCode(m[0])) {
+        return { ok: true, code: m[0] };
+      }
+
+      return { ok: false, code: '' };
     }
 
     function getLiveValidation() {
@@ -825,11 +851,11 @@
         return parsed.ok
           ? {
               cls: 'ok',
-              text: `入力OK：品番=${parsed.code} / 数量=${parsed.qty} / 方式=${parsed.mode === 'concat' ? 'スペースなし' : 'スペースあり'}`
+              text: `入力OK：品番=${parsed.code} / 数量=${parsed.qty} / 方式=${parsed.mode}`
             }
           : {
               cls: 'error',
-              text: '1回目エラー：10〜12桁英数字 + 数量 の形で入力してください（スペース有無どちらも可）'
+              text: '1回目エラー：品番(10〜12桁英数字) + 数量(1〜6桁) の形で入力してください'
             };
       }
 
@@ -884,11 +910,19 @@
         } catch (e) {
           try { scanInput.focus(); } catch (err) {}
         }
-
         if (select) {
           try { scanInput.select(); } catch (e) {}
         }
       }, FOCUS_DELAY_MS);
+    }
+
+    function setInputValueSafely(value) {
+      programmaticUpdating = true;
+      scanInput.value = value;
+      updateValidationNote();
+      setTimeout(() => {
+        programmaticUpdating = false;
+      }, 0);
     }
 
     function applyInputSanitize(keepCaret = true) {
@@ -897,6 +931,7 @@
       const sanitized = sanitizeForInput(before);
 
       if (before !== sanitized) {
+        programmaticUpdating = true;
         scanInput.value = sanitized;
 
         if (keepCaret) {
@@ -906,6 +941,10 @@
             scanInput.setSelectionRange(nextPos, nextPos);
           } catch (e) {}
         }
+
+        setTimeout(() => {
+          programmaticUpdating = false;
+        }, 0);
       }
 
       updateValidationNote();
@@ -922,26 +961,20 @@
       const raw = scanInput.value;
       if (!raw || stage === 3) return false;
 
-      if (stage === 1) {
-        return parseFirstLabel(raw).ok;
-      }
-
-      if (stage === 2) {
-        return parseSecondLabel(raw).ok;
-      }
+      if (stage === 1) return parseFirstLabel(raw).ok;
+      if (stage === 2) return parseSecondLabel(raw).ok;
 
       return false;
     }
 
     function scheduleAutoSubmit(reason) {
       clearAutoSubmitTimer();
-
+      if (programmaticUpdating) return;
       if (!canAutoSubmitCurrentValue()) return;
 
       autoSubmitTimer = setTimeout(() => {
-        if (stage === 3 || isHandling || isComposing) return;
+        if (stage === 3 || isHandling || isComposing || programmaticUpdating) return;
         if (!canAutoSubmitCurrentValue()) return;
-
         addLog(`auto submit: ${reason}`);
         handleScan();
       }, AUTO_SUBMIT_DELAY_MS);
@@ -954,7 +987,7 @@
       firstData = { raw: '', code: '', qty: '' };
       isHandling = false;
 
-      scanInput.value = '';
+      setInputValueSafely('');
       firstRawView.textContent = '—';
       firstParsedView.textContent = '—';
       secondCodeView.textContent = '—';
@@ -988,7 +1021,7 @@
           'state-red',
           '1回目エラー',
           '1回目 読取エラー',
-          '形式は「10〜12桁英数字 + 数量」です（スペース有無どちらも可）'
+          '品番(10〜12桁英数字) + 数量(1〜6桁) の形式で読み込んでください'
         );
 
         addLog('1回目形式エラー: ' + normalizeText(raw));
@@ -1006,7 +1039,9 @@
       };
 
       firstParsedView.textContent =
-        `品番: ${parsed.code} / 数量: ${parsed.qty} / 判定: ${parsed.mode === 'concat' ? 'スペースなし連続読取' : 'スペースあり'}`;
+        `品番: ${parsed.code} / 数量: ${parsed.qty} / 判定: ${parsed.mode}`;
+
+      stage = 2;
 
       setCardState(
         'state-blue',
@@ -1017,10 +1052,8 @@
 
       addLog(`1回目確定: 品番=${parsed.code} / 数量=${parsed.qty} / mode=${parsed.mode}`);
 
-      stage = 2;
-      scanInput.value = '';
+      setInputValueSafely('');
       signalInfo();
-      updateValidationNote();
       focusInput();
     }
 
@@ -1097,7 +1130,7 @@
     }
 
     async function handleScan() {
-      if (isHandling || isComposing) return;
+      if (isHandling || isComposing || programmaticUpdating) return;
       isHandling = true;
 
       try {
@@ -1121,7 +1154,7 @@
       } finally {
         setTimeout(() => {
           isHandling = false;
-        }, 120);
+        }, 100);
       }
     }
 
@@ -1130,19 +1163,15 @@
         e.key === 'Enter' ||
         e.key === 'Tab' ||
         e.key === 'NumpadEnter' ||
-        e.key === 'Go' ||
-        e.key === 'Done' ||
         e.code === 'Enter' ||
         e.code === 'NumpadEnter' ||
         e.keyCode === 13 ||
-        e.keyCode === 9 ||
-        e.which === 13 ||
-        e.which === 9
+        e.which === 13
       );
     }
 
     function onScannerValueChanged() {
-      if (isComposing) return;
+      if (isComposing || programmaticUpdating) return;
       applyInputSanitize();
       scheduleAutoSubmit('input idle');
     }
@@ -1152,15 +1181,16 @@
     });
 
     scanInput.addEventListener('change', () => {
+      if (programmaticUpdating) return;
       applyInputSanitize(false);
       if (stage !== 3 && scanInput.value.trim()) {
-        addLog('change submit');
-        handleScan();
+        scheduleAutoSubmit('change');
       }
     });
 
     scanInput.addEventListener('paste', (e) => {
       e.preventDefault();
+
       const pasted = (e.clipboardData || window.clipboardData).getData('text');
       const sanitized = sanitizeForInput(pasted);
 
@@ -1168,6 +1198,7 @@
       const end = scanInput.selectionEnd || 0;
       const current = scanInput.value;
 
+      programmaticUpdating = true;
       scanInput.value = current.slice(0, start) + sanitized + current.slice(end);
 
       const pos = start + sanitized.length;
@@ -1175,8 +1206,11 @@
         scanInput.setSelectionRange(pos, pos);
       } catch (err) {}
 
-      applyInputSanitize(false);
-      scheduleAutoSubmit('paste');
+      setTimeout(() => {
+        programmaticUpdating = false;
+        applyInputSanitize(false);
+        scheduleAutoSubmit('paste');
+      }, 0);
     });
 
     scanInput.addEventListener('compositionstart', () => {
@@ -1193,20 +1227,8 @@
     scanInput.addEventListener('keydown', (e) => {
       if (isSubmitLikeKeyEvent(e)) {
         e.preventDefault();
-        addLog(`keydown submit key: key=${e.key || ''} code=${e.code || ''} keyCode=${e.keyCode || ''}`);
-        handleScan();
-        return;
-      }
-
-      if (e.key && e.key.length === 1) {
-        scheduleAutoSubmit('keydown char');
-      }
-    });
-
-    scanInput.addEventListener('keyup', (e) => {
-      if (isSubmitLikeKeyEvent(e)) {
-        e.preventDefault();
-        addLog(`keyup submit key: key=${e.key || ''} code=${e.code || ''} keyCode=${e.keyCode || ''}`);
+        clearAutoSubmitTimer();
+        addLog(`submit key: key=${e.key || ''} code=${e.code || ''}`);
         handleScan();
       }
     });
