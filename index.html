@@ -47,9 +47,11 @@
       background: var(--bg);
       color: var(--text);
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", sans-serif;
+      -webkit-text-size-adjust: 100%;
     }
 
     body {
+      min-height: 100vh;
       min-height: 100dvh;
     }
 
@@ -101,6 +103,7 @@
       color: #fff;
       min-height: 48px;
       -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
 
     button.danger { background: #b91c1c; }
@@ -170,6 +173,8 @@
       background: #fff;
       min-height: 52px;
       letter-spacing: .02em;
+      -webkit-appearance: none;
+      appearance: none;
     }
 
     input[type="text"]:focus {
@@ -378,8 +383,8 @@
   <main>
     <div class="card">
       <div class="row">
-        <button id="btnFocus">入力欄へフォーカス</button>
-        <button id="btnReset" class="danger">最初に戻す</button>
+        <button id="btnFocus" type="button">入力欄へフォーカス</button>
+        <button id="btnReset" type="button" class="danger">最初に戻す</button>
       </div>
 
       <div class="field">
@@ -394,7 +399,7 @@
             ※ 全角英数字は自動で半角へ補正します<br>
             ※ 英字は自動で大文字へ補正します<br>
             ※ 全角スペース / 「.」 / 「。」はスペースとして認識します<br>
-            ※ BluetoothバーコードリーダーがEnterを送信する設定なら、そのまま確定できます
+            ※ iPhone13系でEnterが来ない場合でも、自動確定で判定します
           </div>
         </details>
       </div>
@@ -465,7 +470,7 @@
         </div>
       </div>
       <div class="field">
-        <button id="btnClearCounts" class="subtle">件数・ログをクリア</button>
+        <button id="btnClearCounts" type="button" class="subtle">件数・ログをクリア</button>
       </div>
     </div>
 
@@ -503,7 +508,7 @@
     const countMismatchEl = document.getElementById('countMismatch');
     const countErrorEl = document.getElementById('countError');
 
-    const STORAGE_KEY = 'scan_match_app_v3';
+    const STORAGE_KEY = 'scan_match_app_v4_ios_compat';
     const LOG_LIMIT = 150;
 
     // Supabase を使う場合だけ値を入れてください。未設定なら自動で無効です。
@@ -511,10 +516,17 @@
     const SUPABASE_ANON_KEY = '';
     const SUPABASE_TABLE = 'scan_logs';
 
+    // 自動確定の待機時間
+    const AUTO_SUBMIT_DELAY_MS = 180;
+    const FOCUS_DELAY_MS = 80;
+
     let stage = 1; // 1:1回目待受 2:2回目待受 3:判定後停止
     let firstData = { raw: '', code: '', qty: '' };
     let isHandling = false;
     let isComposing = false;
+    let autoSubmitTimer = null;
+    let audioCtx = null;
+    let audioUnlocked = false;
 
     let appState = {
       counts: {
@@ -583,12 +595,6 @@
       saveState();
     }
 
-    function clearLog() {
-      appState.logs = ['log: ready'];
-      renderLogs();
-      saveState();
-    }
-
     function incrementCount(type) {
       if (type === 'match') {
         appState.counts.total += 1;
@@ -628,23 +634,47 @@
       } catch (e) {}
     }
 
+    function ensureAudioUnlocked() {
+      try {
+        if (audioUnlocked) return;
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+
+        audioCtx = audioCtx || new Ctx();
+
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume().catch(() => {});
+        }
+
+        audioUnlocked = true;
+      } catch (e) {}
+    }
+
     function beep(freq = 880, ms = 120) {
       try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
+        if (!audioUnlocked || !audioCtx) return;
+
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume().catch(() => {});
+        }
+
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
         osc.frequency.value = freq;
         osc.type = 'sine';
+
         osc.connect(gain);
-        gain.connect(ctx.destination);
-        gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.01);
-        osc.start();
-        setTimeout(() => {
-          gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.02);
-          osc.stop(ctx.currentTime + 0.03);
-          ctx.close();
-        }, ms);
+        gain.connect(audioCtx.destination);
+
+        const now = audioCtx.currentTime;
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.08, now + 0.01);
+
+        osc.start(now);
+        osc.stop(now + ms / 1000);
+
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + ms / 1000);
       } catch (e) {}
     }
 
@@ -659,8 +689,8 @@
     }
 
     function signalError() {
-      beep(220, 220);
-      setTimeout(() => beep(220, 220), 260);
+      beep(220, 180);
+      setTimeout(() => beep(220, 180), 220);
       vibrate([100, 70, 100]);
     }
 
@@ -670,7 +700,6 @@
       );
     }
 
-    // 入力欄用：スペースを認識しつつ、端末差を吸収する
     function sanitizeForInput(str) {
       return toHalfWidthAlphaNum(String(str || ''))
         .replace(/\r/g, '')
@@ -682,7 +711,6 @@
         .toUpperCase();
     }
 
-    // 解析用：余分な空白はまとめる
     function normalizeText(str) {
       return sanitizeForInput(str)
         .replace(/\s+/g, ' ')
@@ -817,11 +845,16 @@
 
     function focusInput(select = false) {
       setTimeout(() => {
-        scanInput.focus();
+        try {
+          scanInput.focus({ preventScroll: true });
+        } catch (e) {
+          try { scanInput.focus(); } catch (err) {}
+        }
+
         if (select) {
           try { scanInput.select(); } catch (e) {}
         }
-      }, 30);
+      }, FOCUS_DELAY_MS);
     }
 
     function applyInputSanitize(keepCaret = true) {
@@ -844,7 +877,45 @@
       updateValidationNote();
     }
 
+    function clearAutoSubmitTimer() {
+      if (autoSubmitTimer) {
+        clearTimeout(autoSubmitTimer);
+        autoSubmitTimer = null;
+      }
+    }
+
+    function canAutoSubmitCurrentValue() {
+      const raw = scanInput.value;
+      if (!raw || stage === 3) return false;
+
+      if (stage === 1) {
+        return parseFirstLabel(raw).ok;
+      }
+
+      if (stage === 2) {
+        return parseSecondLabel(raw).ok;
+      }
+
+      return false;
+    }
+
+    function scheduleAutoSubmit(reason) {
+      clearAutoSubmitTimer();
+
+      if (!canAutoSubmitCurrentValue()) return;
+
+      autoSubmitTimer = setTimeout(() => {
+        if (stage === 3 || isHandling || isComposing) return;
+        if (!canAutoSubmitCurrentValue()) return;
+
+        addLog(`auto submit: ${reason}`);
+        handleScan();
+      }, AUTO_SUBMIT_DELAY_MS);
+    }
+
     function resetAll() {
+      clearAutoSubmitTimer();
+
       stage = 1;
       firstData = { raw: '', code: '', qty: '' };
       isHandling = false;
@@ -867,6 +938,7 @@
     }
 
     async function acceptFirstScan() {
+      clearAutoSubmitTimer();
       applyInputSanitize(false);
 
       const raw = scanInput.value;
@@ -918,6 +990,7 @@
     }
 
     async function judgeSecondScan() {
+      clearAutoSubmitTimer();
       applyInputSanitize(false);
 
       const raw = scanInput.value;
@@ -985,7 +1058,7 @@
 
       stage = 3;
       updateValidationNote();
-      scanInput.blur();
+      try { scanInput.blur(); } catch (e) {}
     }
 
     async function handleScan() {
@@ -1017,14 +1090,38 @@
       }
     }
 
-    scanInput.addEventListener('beforeinput', () => {
-      // 一部端末ではここで厳密制御できないため、input側でも補正する
-      setTimeout(() => applyInputSanitize(), 0);
-    });
+    function isSubmitLikeKeyEvent(e) {
+      return (
+        e.key === 'Enter' ||
+        e.key === 'Tab' ||
+        e.key === 'NumpadEnter' ||
+        e.key === 'Go' ||
+        e.key === 'Done' ||
+        e.code === 'Enter' ||
+        e.code === 'NumpadEnter' ||
+        e.keyCode === 13 ||
+        e.keyCode === 9 ||
+        e.which === 13 ||
+        e.which === 9
+      );
+    }
 
-    scanInput.addEventListener('input', () => {
+    function onScannerValueChanged() {
       if (isComposing) return;
       applyInputSanitize();
+      scheduleAutoSubmit('input idle');
+    }
+
+    scanInput.addEventListener('input', () => {
+      onScannerValueChanged();
+    });
+
+    scanInput.addEventListener('change', () => {
+      applyInputSanitize(false);
+      if (stage !== 3 && scanInput.value.trim()) {
+        addLog('change submit');
+        handleScan();
+      }
     });
 
     scanInput.addEventListener('paste', (e) => {
@@ -1044,20 +1141,37 @@
       } catch (err) {}
 
       applyInputSanitize(false);
+      scheduleAutoSubmit('paste');
     });
 
     scanInput.addEventListener('compositionstart', () => {
       isComposing = true;
+      clearAutoSubmitTimer();
     });
 
     scanInput.addEventListener('compositionend', () => {
       isComposing = false;
       applyInputSanitize(false);
+      scheduleAutoSubmit('compositionend');
     });
 
     scanInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
+      if (isSubmitLikeKeyEvent(e)) {
         e.preventDefault();
+        addLog(`keydown submit key: key=${e.key || ''} code=${e.code || ''} keyCode=${e.keyCode || ''}`);
+        handleScan();
+        return;
+      }
+
+      if (e.key && e.key.length === 1) {
+        scheduleAutoSubmit('keydown char');
+      }
+    });
+
+    scanInput.addEventListener('keyup', (e) => {
+      if (isSubmitLikeKeyEvent(e)) {
+        e.preventDefault();
+        addLog(`keyup submit key: key=${e.key || ''} code=${e.code || ''} keyCode=${e.keyCode || ''}`);
         handleScan();
       }
     });
@@ -1069,6 +1183,8 @@
     });
 
     btnFocus.addEventListener('click', () => {
+      ensureAudioUnlocked();
+
       if (stage !== 3) {
         focusInput();
         addLog('input focused');
@@ -1077,9 +1193,13 @@
       }
     });
 
-    btnReset.addEventListener('click', resetAll);
+    btnReset.addEventListener('click', () => {
+      ensureAudioUnlocked();
+      resetAll();
+    });
 
     btnClearCounts.addEventListener('click', () => {
+      ensureAudioUnlocked();
       if (confirm('件数とログをクリアしますか？')) {
         clearCountsAndLogs();
         updateValidationNote();
@@ -1094,16 +1214,23 @@
       }
     });
 
+    // iPhone13系で visibilitychange / pageshow の自動focusが悪さをしやすいため、
+    // 戻ってきた時は軽く遅延して focus するだけにする
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden && stage !== 3) {
-        focusInput();
+        setTimeout(() => focusInput(), 150);
       }
     });
 
     window.addEventListener('pageshow', () => {
       if (stage !== 3) {
-        focusInput();
+        setTimeout(() => focusInput(), 150);
       }
+    });
+
+    // 初回ユーザー操作で音を解放
+    ['touchstart', 'pointerdown', 'mousedown'].forEach((eventName) => {
+      window.addEventListener(eventName, ensureAudioUnlocked, { passive: true, once: true });
     });
 
     loadState();
