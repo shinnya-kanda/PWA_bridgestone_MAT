@@ -392,14 +392,14 @@
           <summary>使用方法を表示</summary>
           <div class="hint-body">
             ① 1回目で現品票を読む（10〜12桁英数字 + 空白 + 数量）<br>
-            ② Enter押下で1回目を確定し、2回目待受へ移行<br>
-            ③ 2回目で品番ラベルを読む（10〜12桁英数字）<br>
-            ④ Enter押下で一致 / 不一致を判定<br>
-            ⑤ 判定後は停止し、「最初に戻す」で次へ進む<br>
+            ② スペースが無くても「品番＋数量」の連続読取に対応<br>
+            ③ Enterが来なくても、1回目成立で自動的に2回目待受へ移行<br>
+            ④ 2回目で品番ラベルを読む（10〜12桁英数字）<br>
+            ⑤ Enter押下または自動確定で一致 / 不一致を判定<br>
+            ⑥ 判定後は停止し、「最初に戻す」で次へ進む<br>
             ※ 全角英数字は自動で半角へ補正します<br>
             ※ 英字は自動で大文字へ補正します<br>
-            ※ 全角スペース / 「.」 / 「。」はスペースとして認識します<br>
-            ※ iPhone13系でEnterが来ない場合でも、自動確定で判定します
+            ※ 全角スペース / 「.」 / 「。」はスペースとして認識します
           </div>
         </details>
       </div>
@@ -417,7 +417,7 @@
           placeholder="ここにバーコードリーダーで入力"
         />
         <div id="validationNote" class="validation-note">
-          1回目待受中：形式は「10〜12桁英数字 + 半角スペース + 数量」
+          1回目待受中：形式は「10〜12桁英数字 + 半角スペース + 数量」または「10〜12桁英数字 + 数量」
         </div>
       </div>
     </div>
@@ -428,7 +428,7 @@
         <span id="stateBadge" class="badge">1回目待受</span>
       </div>
 
-      <div id="resultText" class="result-main">現品票を読み込んで Enter を押してください</div>
+      <div id="resultText" class="result-main">現品票を読み込んでください</div>
       <div id="resultSubText" class="result-sub">1回目待機中です</div>
 
       <div class="mini-grid">
@@ -508,19 +508,19 @@
     const countMismatchEl = document.getElementById('countMismatch');
     const countErrorEl = document.getElementById('countError');
 
-    const STORAGE_KEY = 'scan_match_app_v4_ios_compat';
+    const STORAGE_KEY = 'scan_match_app_v5_concat_qty';
     const LOG_LIMIT = 150;
 
-    // Supabase を使う場合だけ値を入れてください。未設定なら自動で無効です。
     const SUPABASE_URL = '';
     const SUPABASE_ANON_KEY = '';
     const SUPABASE_TABLE = 'scan_logs';
 
-    // 自動確定の待機時間
-    const AUTO_SUBMIT_DELAY_MS = 180;
+    const AUTO_SUBMIT_DELAY_MS = 260;
     const FOCUS_DELAY_MS = 80;
+    const FIRST_QTY_MIN = 1;
+    const FIRST_QTY_MAX = 6;
 
-    let stage = 1; // 1:1回目待受 2:2回目待受 3:判定後停止
+    let stage = 1;
     let firstData = { raw: '', code: '', qty: '' };
     let isHandling = false;
     let isComposing = false;
@@ -663,7 +663,6 @@
 
         osc.frequency.value = freq;
         osc.type = 'sine';
-
         osc.connect(gain);
         gain.connect(audioCtx.destination);
 
@@ -673,7 +672,6 @@
 
         osc.start(now);
         osc.stop(now + ms / 1000);
-
         gain.gain.exponentialRampToValueAtTime(0.0001, now + ms / 1000);
       } catch (e) {}
     }
@@ -727,24 +725,60 @@
       return /^[A-Z0-9]{10,12}$/.test(code);
     }
 
-    function parseFirstLabel(raw) {
-      const text = normalizeText(raw);
-      const match = text.match(/^([A-Z0-9]{10,12})\s+([0-9]+)$/);
-
-      if (!match) {
-        return {
-          ok: false,
-          raw: text,
-          code: '',
-          qty: ''
-        };
-      }
+    function tryParseFirstWithSpace(text) {
+      const match = text.match(/^([A-Z0-9]{10,12})\s+([0-9]{1,6})$/);
+      if (!match) return null;
 
       return {
         ok: true,
         raw: text,
         code: match[1],
-        qty: match[2]
+        qty: String(Number(match[2])),
+        mode: 'space'
+      };
+    }
+
+    function tryParseFirstWithoutSpace(text) {
+      const compact = text.replace(/\s+/g, '');
+      if (!/^[A-Z0-9]+$/.test(compact)) return null;
+
+      for (let codeLen = 12; codeLen >= 10; codeLen--) {
+        if (compact.length <= codeLen) continue;
+
+        const codePart = compact.slice(0, codeLen);
+        const qtyPart = compact.slice(codeLen);
+
+        if (!isValidCode(codePart)) continue;
+        if (!/^[0-9]+$/.test(qtyPart)) continue;
+        if (qtyPart.length < FIRST_QTY_MIN || qtyPart.length > FIRST_QTY_MAX) continue;
+
+        return {
+          ok: true,
+          raw: compact,
+          code: codePart,
+          qty: String(Number(qtyPart)),
+          mode: 'concat'
+        };
+      }
+
+      return null;
+    }
+
+    function parseFirstLabel(raw) {
+      const text = normalizeText(raw);
+
+      const withSpace = tryParseFirstWithSpace(text);
+      if (withSpace) return withSpace;
+
+      const withoutSpace = tryParseFirstWithoutSpace(text);
+      if (withoutSpace) return withoutSpace;
+
+      return {
+        ok: false,
+        raw: text,
+        code: '',
+        qty: '',
+        mode: ''
       };
     }
 
@@ -771,7 +805,7 @@
         if (stage === 1) {
           return {
             cls: '',
-            text: '1回目待受中：形式は「10〜12桁英数字 + 半角スペース + 数量」'
+            text: '1回目待受中：形式は「10〜12桁英数字 + 空白 + 数量」または「10〜12桁英数字 + 数量」'
           };
         }
         if (stage === 2) {
@@ -791,11 +825,11 @@
         return parsed.ok
           ? {
               cls: 'ok',
-              text: `入力OK：品番=${parsed.code} / 数量=${parsed.qty}`
+              text: `入力OK：品番=${parsed.code} / 数量=${parsed.qty} / 方式=${parsed.mode === 'concat' ? 'スペースなし' : 'スペースあり'}`
             }
           : {
               cls: 'error',
-              text: '1回目エラー：10〜12桁英数字 + スペース + 数量 の形式で入力してください'
+              text: '1回目エラー：10〜12桁英数字 + 数量 の形で入力してください（スペース有無どちらも可）'
             };
       }
 
@@ -928,7 +962,7 @@
       setCardState(
         'state-blue',
         '1回目待受',
-        '現品票を読み込んで Enter を押してください',
+        '現品票を読み込んでください',
         '1回目待機中です'
       );
 
@@ -954,7 +988,7 @@
           'state-red',
           '1回目エラー',
           '1回目 読取エラー',
-          '形式は「10〜12桁英数字 + 空白 + 数量」です'
+          '形式は「10〜12桁英数字 + 数量」です（スペース有無どちらも可）'
         );
 
         addLog('1回目形式エラー: ' + normalizeText(raw));
@@ -971,16 +1005,17 @@
         qty: parsed.qty
       };
 
-      firstParsedView.textContent = `品番: ${parsed.code} / 数量: ${parsed.qty}`;
+      firstParsedView.textContent =
+        `品番: ${parsed.code} / 数量: ${parsed.qty} / 判定: ${parsed.mode === 'concat' ? 'スペースなし連続読取' : 'スペースあり'}`;
 
       setCardState(
         'state-blue',
         '2回目待受',
         '1回目 読取OK',
-        '2回目で品番ラベルを読み込んで Enter を押してください'
+        '2回目で品番ラベルを読み込んでください'
       );
 
-      addLog(`1回目確定: 品番=${parsed.code} / 数量=${parsed.qty}`);
+      addLog(`1回目確定: 品番=${parsed.code} / 数量=${parsed.qty} / mode=${parsed.mode}`);
 
       stage = 2;
       scanInput.value = '';
@@ -1214,8 +1249,6 @@
       }
     });
 
-    // iPhone13系で visibilitychange / pageshow の自動focusが悪さをしやすいため、
-    // 戻ってきた時は軽く遅延して focus するだけにする
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden && stage !== 3) {
         setTimeout(() => focusInput(), 150);
@@ -1228,7 +1261,6 @@
       }
     });
 
-    // 初回ユーザー操作で音を解放
     ['touchstart', 'pointerdown', 'mousedown'].forEach((eventName) => {
       window.addEventListener(eventName, ensureAudioUnlocked, { passive: true, once: true });
     });
