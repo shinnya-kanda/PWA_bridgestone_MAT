@@ -1,0 +1,1394 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>現品票・品番ラベル 突合</title>
+
+  <meta name="theme-color" content="#111827" />
+  <meta name="description" content="現品票と品番ラベルの突合を行うPWAアプリ" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="現品票突合" />
+
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+
+  <style>
+    :root{
+      --bg:#eef2f7;
+      --card:#ffffff;
+      --text:#111827;
+      --muted:#6b7280;
+      --border:#dbe2ea;
+
+      --blue-bg:#dbeafe;
+      --blue-border:#60a5fa;
+      --blue-text:#1e3a8a;
+
+      --green-bg:#dcfce7;
+      --green-border:#22c55e;
+      --green-text:#166534;
+
+      --red-bg:#fee2e2;
+      --red-border:#ef4444;
+      --red-text:#991b1b;
+
+      --amber-bg:#fef3c7;
+      --amber-border:#f59e0b;
+      --amber-text:#92400e;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", sans-serif;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+      min-height: 100vh;
+      min-height: 100dvh;
+    }
+
+    header {
+      padding: 10px 12px;
+      background: #111827;
+      color: #fff;
+      font-weight: 800;
+      font-size: 16px;
+      line-height: 1.4;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    main {
+      max-width: 520px;
+      margin: 0 auto;
+      padding: 10px 10px 14px;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 14px;
+      padding: 10px;
+      box-shadow: 0 6px 18px rgba(0,0,0,.06);
+      margin-bottom: 10px;
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .row > * {
+      flex: 1;
+    }
+
+    button {
+      width: 100%;
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 10px;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+      background: #111827;
+      color: #fff;
+      min-height: 48px;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+
+    button.danger { background: #b91c1c; }
+    button.subtle { background: #475569; }
+
+    details {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #f9fafb;
+      overflow: hidden;
+    }
+
+    summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 12px 14px;
+      font-weight: 800;
+      font-size: 14px;
+      user-select: none;
+      position: relative;
+    }
+
+    summary::-webkit-details-marker { display: none; }
+
+    summary::after {
+      content: "＋";
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 18px;
+      font-weight: 900;
+      color: #374151;
+    }
+
+    details[open] summary::after {
+      content: "－";
+    }
+
+    .hint-body {
+      padding: 0 14px 12px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.65;
+      border-top: 1px solid var(--border);
+      background: #fff;
+    }
+
+    .field {
+      margin-top: 8px;
+    }
+
+    .label {
+      font-size: 12px;
+      font-weight: 800;
+      color: #374151;
+      margin-bottom: 5px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 14px 12px;
+      border: 2px solid #cfd8e3;
+      border-radius: 12px;
+      font-size: 18px;
+      font-weight: 700;
+      background: #fff;
+      min-height: 52px;
+      letter-spacing: .02em;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #111827;
+      box-shadow: 0 0 0 4px rgba(17,24,39,.08);
+    }
+
+    .validation-note {
+      margin-top: 8px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid #dbe2ea;
+      background: #f8fafc;
+      font-size: 12px;
+      line-height: 1.6;
+      color: #334155;
+    }
+
+    .validation-note.error {
+      background: #fef2f2;
+      border-color: #fecaca;
+      color: #991b1b;
+    }
+
+    .validation-note.ok {
+      background: #f0fdf4;
+      border-color: #bbf7d0;
+      color: #166534;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 34px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 900;
+      background: rgba(255,255,255,.7);
+      color: #111827;
+      border: 1px solid rgba(255,255,255,.7);
+      backdrop-filter: blur(2px);
+    }
+
+    .status-card {
+      border-radius: 16px;
+      padding: 12px;
+      border: 2px solid var(--blue-border);
+      background: var(--blue-bg);
+      color: var(--blue-text);
+      transition: .2s ease;
+    }
+
+    .status-card.state-blue {
+      background: var(--blue-bg);
+      border-color: var(--blue-border);
+      color: var(--blue-text);
+    }
+
+    .status-card.state-green {
+      background: var(--green-bg);
+      border-color: var(--green-border);
+      color: var(--green-text);
+    }
+
+    .status-card.state-red {
+      background: var(--red-bg);
+      border-color: var(--red-border);
+      color: var(--red-text);
+    }
+
+    .status-card.state-amber {
+      background: var(--amber-bg);
+      border-color: var(--amber-border);
+      color: var(--amber-text);
+    }
+
+    .status-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .status-title {
+      font-size: 13px;
+      font-weight: 900;
+      opacity: .9;
+    }
+
+    .result-main {
+      font-size: 30px;
+      font-weight: 1000;
+      line-height: 1.15;
+      letter-spacing: .02em;
+      margin-top: 4px;
+    }
+
+    .result-sub {
+      margin-top: 6px;
+      font-size: 15px;
+      font-weight: 800;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+
+    .mini-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .mini-item {
+      background: rgba(255,255,255,.55);
+      border: 1px solid rgba(255,255,255,.7);
+      border-radius: 12px;
+      padding: 8px 10px;
+    }
+
+    .mini-item .mini-label {
+      font-size: 11px;
+      font-weight: 900;
+      opacity: .85;
+      margin-bottom: 4px;
+    }
+
+    .mini-item .mini-value {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 14px;
+      font-weight: 800;
+      word-break: break-all;
+      line-height: 1.4;
+    }
+
+    .counter-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .counter-item {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .counter-label {
+      font-size: 11px;
+      font-weight: 900;
+      color: #475569;
+      margin-bottom: 4px;
+    }
+
+    .counter-value {
+      font-size: 22px;
+      font-weight: 1000;
+      line-height: 1.1;
+    }
+
+    .log {
+      background: #111827;
+      color: #e5e7eb;
+      border-radius: 12px;
+      padding: 10px;
+      white-space: pre-wrap;
+      font-size: 12px;
+      line-height: 1.45;
+      min-height: 140px;
+      max-height: 240px;
+      overflow: auto;
+    }
+
+    .footer-note {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.5;
+      text-align: center;
+      padding: 4px 6px 0;
+    }
+
+    @media (max-width: 430px) {
+      .result-main { font-size: 26px; }
+      .result-sub { font-size: 14px; }
+      input[type="text"] { font-size: 17px; }
+      button { font-size: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <header>現品票・品番ラベル 突合</header>
+
+  <main>
+    <div class="card">
+      <div class="row">
+        <button id="btnFocus" type="button">入力欄へフォーカス</button>
+        <button id="btnReset" type="button" class="danger">最初に戻す</button>
+      </div>
+
+      <div class="field">
+        <details>
+          <summary>使用方法を表示</summary>
+          <div class="hint-body">
+            ① 1回目で現品票を読む（品番 + 数量）<br>
+            ② 1回目は品番マスタと照合して、最も妥当な品番へ確定します<br>
+            ③ スペースが無くても「品番＋数量」の連続読取に対応します<br>
+            ④ Enterが来なくても、入力停止後に自動確定します<br>
+            ⑤ 2回目で品番ラベルを読む（品番のみ）<br>
+            ⑥ 判定後は停止し、「最初に戻す」で次へ進みます<br>
+            ※ マスタはハイフン除去済みで内部照合します<br>
+            ※ 全角英数字は自動で半角へ補正します<br>
+            ※ 英字は自動で大文字へ補正します<br>
+            ※ 全角スペース / 改行 / Tab / 「.」 / 「。」は区切りとして認識します
+          </div>
+        </details>
+      </div>
+
+      <div class="field">
+        <div class="label">入力欄（1回目・2回目共通）</div>
+        <input
+          id="scanInput"
+          type="text"
+          inputmode="text"
+          autocomplete="off"
+          autocapitalize="characters"
+          spellcheck="false"
+          enterkeyhint="done"
+          placeholder="ここにバーコードリーダーで入力"
+        />
+        <div id="validationNote" class="validation-note">
+          1回目待受中：現品票を読み込むと、品番マスタ照合で品番を確定します
+        </div>
+      </div>
+    </div>
+
+    <div id="statusCard" class="status-card state-blue">
+      <div class="status-top">
+        <div class="status-title">状態 / 判定</div>
+        <span id="stateBadge" class="badge">1回目待受</span>
+      </div>
+
+      <div id="resultText" class="result-main">現品票を読み込んでください</div>
+      <div id="resultSubText" class="result-sub">1回目待機中です</div>
+
+      <div class="mini-grid">
+        <div class="mini-item">
+          <div class="mini-label">1回目 現品票 生データ</div>
+          <div id="firstRawView" class="mini-value">—</div>
+        </div>
+
+        <div class="mini-item">
+          <div class="mini-label">1回目 確定結果</div>
+          <div id="firstParsedView" class="mini-value">—</div>
+        </div>
+
+        <div class="mini-item">
+          <div class="mini-label">2回目 品番ラベル</div>
+          <div id="secondCodeView" class="mini-value">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">本日カウンター</div>
+      <div class="counter-grid">
+        <div class="counter-item">
+          <div class="counter-label">総判定数</div>
+          <div id="countTotal" class="counter-value">0</div>
+        </div>
+        <div class="counter-item">
+          <div class="counter-label">一致</div>
+          <div id="countMatch" class="counter-value">0</div>
+        </div>
+        <div class="counter-item">
+          <div class="counter-label">不一致</div>
+          <div id="countMismatch" class="counter-value">0</div>
+        </div>
+        <div class="counter-item">
+          <div class="counter-label">読取エラー</div>
+          <div id="countError" class="counter-value">0</div>
+        </div>
+      </div>
+      <div class="field">
+        <button id="btnClearCounts" type="button" class="subtle">件数・ログをクリア</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">ログ</div>
+      <div id="log" class="log">log: ready</div>
+    </div>
+
+    <div class="footer-note">
+      不一致時は作業を中断し、現物・現品票・ラベルを再確認してください。
+    </div>
+  </main>
+
+  <script>
+    const scanInput = document.getElementById('scanInput');
+    const btnFocus = document.getElementById('btnFocus');
+    const btnReset = document.getElementById('btnReset');
+    const btnClearCounts = document.getElementById('btnClearCounts');
+
+    const statusCard = document.getElementById('statusCard');
+    const stateBadge = document.getElementById('stateBadge');
+
+    const firstRawView = document.getElementById('firstRawView');
+    const firstParsedView = document.getElementById('firstParsedView');
+    const secondCodeView = document.getElementById('secondCodeView');
+
+    const resultText = document.getElementById('resultText');
+    const resultSubText = document.getElementById('resultSubText');
+    const validationNote = document.getElementById('validationNote');
+
+    const logEl = document.getElementById('log');
+
+    const countTotalEl = document.getElementById('countTotal');
+    const countMatchEl = document.getElementById('countMatch');
+    const countMismatchEl = document.getElementById('countMismatch');
+    const countErrorEl = document.getElementById('countError');
+
+    const STORAGE_KEY = 'scan_match_app_v7_master_confirm';
+    const LOG_LIMIT = 150;
+
+    const SUPABASE_URL = '';
+    const SUPABASE_ANON_KEY = '';
+    const SUPABASE_TABLE = 'scan_logs';
+
+    const AUTO_SUBMIT_DELAY_MS = 140;
+    const FOCUS_DELAY_MS = 80;
+    const FIRST_QTY_MIN = 1;
+    const FIRST_QTY_MAX = 6;
+    const FUZZY_MAX_DISTANCE = 1;
+
+    const MASTER_PARTS_RAW = [
+      '419-54-52630', '423-54-52631', '425-54-43262', '423-V8-85470', '419-94-45390',
+      '423-54-43220', '20C-54-31910', '21U-54-31932', '21X-54-31951', '21X-54-31950',
+      '20A-54-21720', '21U-54-37920', '417-54-6263A', '425-54-55261', '425-54-55271',
+      '425-54-5527B', '423-54-43141', '423-95-96871', '22J-54-15613', '421-54-68270',
+      '423-95-96870', '21X-54-63821', '21U-97-33812', '22L-54-11914', '20C-54-31920',
+      '22J-54-15622', '21X-96-83160', '423-S5-76140', '22J-54-1A220', '21U-54-39430',
+      '21U-97-33980', '423-92-36130', '423-959-6872'
+    ];
+
+    const MASTER_PARTS = MASTER_PARTS_RAW.map((display) => ({
+      display,
+      normalized: display.replace(/-/g, '').toUpperCase()
+    }));
+
+    let stage = 1;
+    let firstData = {
+      raw: '',
+      code: '',
+      qty: '',
+      masterDisplay: '',
+      confidence: '',
+      mode: '',
+      sourceCode: ''
+    };
+    let isHandling = false;
+    let isComposing = false;
+    let autoSubmitTimer = null;
+    let programmaticUpdating = false;
+    let audioCtx = null;
+    let audioUnlocked = false;
+
+    let appState = {
+      counts: {
+        total: 0,
+        match: 0,
+        mismatch: 0,
+        error: 0
+      },
+      logs: ['log: ready']
+    };
+
+    function nowStamp() {
+      const now = new Date();
+      const yy = now.getFullYear();
+      const mo = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      const ss = String(now.getSeconds()).padStart(2, '0');
+      return `${yy}-${mo}-${dd} ${hh}:${mm}:${ss}`;
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+      } catch (e) {}
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          if (parsed.counts) {
+            appState.counts.total = Number(parsed.counts.total || 0);
+            appState.counts.match = Number(parsed.counts.match || 0);
+            appState.counts.mismatch = Number(parsed.counts.mismatch || 0);
+            appState.counts.error = Number(parsed.counts.error || 0);
+          }
+          if (Array.isArray(parsed.logs) && parsed.logs.length) {
+            appState.logs = parsed.logs.slice(-LOG_LIMIT);
+          }
+        }
+      } catch (e) {}
+    }
+
+    function renderCounts() {
+      countTotalEl.textContent = String(appState.counts.total);
+      countMatchEl.textContent = String(appState.counts.match);
+      countMismatchEl.textContent = String(appState.counts.mismatch);
+      countErrorEl.textContent = String(appState.counts.error);
+    }
+
+    function renderLogs() {
+      logEl.textContent = appState.logs.join('\n');
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function addLog(msg) {
+      appState.logs.push(`[${nowStamp()}] ${msg}`);
+      if (appState.logs.length > LOG_LIMIT) {
+        appState.logs = appState.logs.slice(-LOG_LIMIT);
+      }
+      renderLogs();
+      saveState();
+    }
+
+    function incrementCount(type) {
+      if (type === 'match') {
+        appState.counts.total += 1;
+        appState.counts.match += 1;
+      } else if (type === 'mismatch') {
+        appState.counts.total += 1;
+        appState.counts.mismatch += 1;
+      } else if (type === 'error') {
+        appState.counts.error += 1;
+      }
+      renderCounts();
+      saveState();
+    }
+
+    function clearCountsAndLogs() {
+      appState.counts = { total: 0, match: 0, mismatch: 0, error: 0 };
+      appState.logs = ['log: ready'];
+      renderCounts();
+      renderLogs();
+      saveState();
+      addLog('counts/logs cleared');
+    }
+
+    function setCardState(mode, badgeText, mainText, subText) {
+      statusCard.className = 'status-card ' + mode;
+      stateBadge.textContent = badgeText;
+      resultText.textContent = mainText;
+      resultSubText.textContent = subText || '';
+      updateValidationNote();
+    }
+
+    function vibrate(pattern) {
+      try {
+        if (navigator.vibrate) navigator.vibrate(pattern);
+      } catch (e) {}
+    }
+
+    function ensureAudioUnlocked() {
+      try {
+        if (audioUnlocked) return;
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        audioCtx = audioCtx || new Ctx();
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume().catch(() => {});
+        }
+        audioUnlocked = true;
+      } catch (e) {}
+    }
+
+    function beep(freq = 880, ms = 120) {
+      try {
+        if (!audioUnlocked || !audioCtx) return;
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume().catch(() => {});
+        }
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.frequency.value = freq;
+        osc.type = 'sine';
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        const now = audioCtx.currentTime;
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.08, now + 0.01);
+
+        osc.start(now);
+        osc.stop(now + ms / 1000);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + ms / 1000);
+      } catch (e) {}
+    }
+
+    function signalOk() {
+      beep(1040, 140);
+      vibrate(80);
+    }
+
+    function signalInfo() {
+      beep(660, 90);
+      vibrate(40);
+    }
+
+    function signalError() {
+      beep(220, 180);
+      setTimeout(() => beep(220, 180), 220);
+      vibrate([100, 70, 100]);
+    }
+
+    function toHalfWidthAlphaNum(str) {
+      return String(str || '').replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s) =>
+        String.fromCharCode(s.charCodeAt(0) - 0xFEE0)
+      );
+    }
+
+    function sanitizeForInput(str) {
+      return toHalfWidthAlphaNum(String(str || ''))
+        .replace(/\r/g, '\n')
+        .replace(/　/g, ' ')
+        .replace(/[。\.]/g, ' ')
+        .replace(/\t/g, ' ')
+        .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]/g, '-')
+        .replace(/[^A-Za-z0-9 \-\n]/g, '')
+        .toUpperCase();
+    }
+
+    function normalizeText(str) {
+      return sanitizeForInput(str)
+        .replace(/\n+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    function compactAlphaNum(str) {
+      return normalizeText(str).replace(/[^A-Z0-9]/g, '');
+    }
+
+    function normalizeCode(str) {
+      return compactAlphaNum(str);
+    }
+
+    function isValidCode(code) {
+      return /^[A-Z0-9]{10,12}$/.test(code);
+    }
+
+    function levenshtein(a, b) {
+      const m = a.length;
+      const n = b.length;
+      const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+
+      for (let i = 0; i <= m; i++) dp[i][0] = i;
+      for (let j = 0; j <= n; j++) dp[0][j] = j;
+
+      for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+          const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+          dp[i][j] = Math.min(
+            dp[i - 1][j] + 1,
+            dp[i][j - 1] + 1,
+            dp[i - 1][j - 1] + cost
+          );
+        }
+      }
+      return dp[m][n];
+    }
+
+    function buildFirstMasterCandidates(compact) {
+      const results = [];
+      if (!compact) return results;
+
+      for (const master of MASTER_PARTS) {
+        const code = master.normalized;
+        const idx = compact.indexOf(code);
+
+        if (idx !== -1) {
+          const qtyStart = idx + code.length;
+          const qtyRemain = compact.slice(qtyStart);
+          const qtyMatch = qtyRemain.match(/^[0-9]{1,6}/);
+
+          if (qtyMatch) {
+            results.push({
+              matchedType: 'exact',
+              confidence: 'EXACT',
+              score: 1000 - idx,
+              start: idx,
+              code,
+              sourceCode: code,
+              qty: String(Number(qtyMatch[0])),
+              qtyLen: qtyMatch[0].length,
+              masterDisplay: master.display,
+              distance: 0
+            });
+          }
+        }
+      }
+
+      for (let start = 0; start < compact.length; start++) {
+        for (const master of MASTER_PARTS) {
+          const code = master.normalized;
+          const codeLen = code.length;
+          const qtyStart = start + codeLen;
+          const qtyPart = compact.slice(qtyStart, qtyStart + FIRST_QTY_MAX);
+          const qtyMatch = qtyPart.match(/^[0-9]{1,6}/);
+          if (!qtyMatch) continue;
+
+          const candidateCode = compact.slice(start, qtyStart);
+          if (candidateCode.length !== codeLen) continue;
+
+          const dist = levenshtein(candidateCode, code);
+          if (dist > FUZZY_MAX_DISTANCE) continue;
+
+          results.push({
+            matchedType: 'fuzzy',
+            confidence: `FUZZY(${dist})`,
+            score: 700 - (dist * 100) - start,
+            start,
+            code,
+            sourceCode: candidateCode,
+            qty: String(Number(qtyMatch[0])),
+            qtyLen: qtyMatch[0].length,
+            masterDisplay: master.display,
+            distance: dist
+          });
+        }
+      }
+
+      results.sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        if (a.start !== b.start) return a.start - b.start;
+        if (a.distance !== b.distance) return a.distance - b.distance;
+        if (b.code.length !== a.code.length) return b.code.length - a.code.length;
+        return a.qtyLen - b.qtyLen;
+      });
+
+      return results;
+    }
+
+    function pickBestFirstCandidate(compact) {
+      const candidates = buildFirstMasterCandidates(compact);
+      if (!candidates.length) return null;
+
+      const best = candidates[0];
+      const ties = candidates.filter((c) => c.score === best.score && c.code === best.code);
+      if (ties.length > 1) return best;
+
+      if (best.matchedType === 'fuzzy') {
+        const sameScoreDifferent = candidates.filter((c) => c.score === best.score && c.code !== best.code);
+        if (sameScoreDifferent.length) return null;
+      }
+
+      return best;
+    }
+
+    function parseFirstLabel(raw) {
+      const text = normalizeText(raw);
+      if (!text) {
+        return { ok: false, raw: '', code: '', qty: '', mode: '', masterDisplay: '', confidence: '', sourceCode: '' };
+      }
+
+      const compact = compactAlphaNum(text);
+      if (!compact) {
+        return { ok: false, raw: text, code: '', qty: '', mode: '', masterDisplay: '', confidence: '', sourceCode: '' };
+      }
+
+      const picked = pickBestFirstCandidate(compact);
+      if (!picked) {
+        return { ok: false, raw: text, code: '', qty: '', mode: '', masterDisplay: '', confidence: '', sourceCode: '' };
+      }
+
+      return {
+        ok: true,
+        raw: text,
+        code: picked.code,
+        qty: picked.qty,
+        mode: picked.matchedType,
+        masterDisplay: picked.masterDisplay,
+        confidence: picked.confidence,
+        sourceCode: picked.sourceCode
+      };
+    }
+
+    function parseSecondLabel(raw) {
+      const text = normalizeText(raw);
+      const compact = compactAlphaNum(text);
+
+      if (MASTER_PARTS.some((m) => m.normalized === compact)) {
+        return { ok: true, code: compact };
+      }
+
+      if (isValidCode(compact)) {
+        return { ok: true, code: compact };
+      }
+
+      const m = compact.match(/[A-Z0-9]{10,12}/);
+      if (m && isValidCode(m[0])) {
+        return { ok: true, code: m[0] };
+      }
+
+      return { ok: false, code: '' };
+    }
+
+    function getLiveValidation() {
+      const raw = scanInput.value;
+
+      if (!raw) {
+        if (stage === 1) {
+          return {
+            cls: '',
+            text: '1回目待受中：現品票を読むと、品番マスタ照合で品番を確定します'
+          };
+        }
+        if (stage === 2) {
+          return {
+            cls: '',
+            text: '2回目待受中：品番ラベルを読んでください（ハイフン無し判定）'
+          };
+        }
+        return {
+          cls: '',
+          text: '停止中：「最初に戻す」を押してください'
+        };
+      }
+
+      if (stage === 1) {
+        const parsed = parseFirstLabel(raw);
+        return parsed.ok
+          ? {
+              cls: 'ok',
+              text: `入力OK：確定品番=${parsed.masterDisplay} / 数量=${parsed.qty} / 照合=${parsed.confidence}`
+            }
+          : {
+              cls: 'error',
+              text: '1回目エラー：マスタ品番 + 数量 の形で再読込してください'
+            };
+      }
+
+      if (stage === 2) {
+        const parsed = parseSecondLabel(raw);
+        return parsed.ok
+          ? {
+              cls: 'ok',
+              text: `入力OK：品番=${parsed.code}`
+            }
+          : {
+              cls: 'error',
+              text: '2回目エラー：品番ラベルは10〜12桁の半角英数字で入力してください'
+            };
+      }
+
+      return {
+        cls: '',
+        text: '停止中：「最初に戻す」を押してください'
+      };
+    }
+
+    function updateValidationNote() {
+      const info = getLiveValidation();
+      validationNote.className = 'validation-note' + (info.cls ? ' ' + info.cls : '');
+      validationNote.textContent = info.text;
+    }
+
+    async function postToSupabase(payload) {
+      if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_TABLE) return;
+
+      try {
+        await fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify(payload)
+        });
+      } catch (e) {
+        addLog('Supabase送信失敗');
+      }
+    }
+
+    function focusInput(select = false) {
+      setTimeout(() => {
+        try {
+          scanInput.focus({ preventScroll: true });
+        } catch (e) {
+          try { scanInput.focus(); } catch (err) {}
+        }
+        if (select) {
+          try { scanInput.select(); } catch (e) {}
+        }
+      }, FOCUS_DELAY_MS);
+    }
+
+    function setInputValueSafely(value) {
+      programmaticUpdating = true;
+      scanInput.value = value;
+      updateValidationNote();
+      setTimeout(() => {
+        programmaticUpdating = false;
+      }, 0);
+    }
+
+    function applyInputSanitize(keepCaret = true) {
+      const before = scanInput.value;
+      const start = scanInput.selectionStart || 0;
+      const sanitized = sanitizeForInput(before);
+
+      if (before !== sanitized) {
+        programmaticUpdating = true;
+        scanInput.value = sanitized;
+
+        if (keepCaret) {
+          const diff = before.length - sanitized.length;
+          const nextPos = Math.max(0, start - Math.max(0, diff));
+          try {
+            scanInput.setSelectionRange(nextPos, nextPos);
+          } catch (e) {}
+        }
+
+        setTimeout(() => {
+          programmaticUpdating = false;
+        }, 0);
+      }
+
+      updateValidationNote();
+    }
+
+    function clearAutoSubmitTimer() {
+      if (autoSubmitTimer) {
+        clearTimeout(autoSubmitTimer);
+        autoSubmitTimer = null;
+      }
+    }
+
+    function canAutoSubmitCurrentValue() {
+      const raw = scanInput.value;
+      if (!raw || stage === 3) return false;
+      if (stage === 1) return parseFirstLabel(raw).ok;
+      if (stage === 2) return parseSecondLabel(raw).ok;
+      return false;
+    }
+
+    function scheduleAutoSubmit(reason) {
+      clearAutoSubmitTimer();
+      if (programmaticUpdating) return;
+      if (!canAutoSubmitCurrentValue()) return;
+
+      autoSubmitTimer = setTimeout(() => {
+        if (stage === 3 || isHandling || isComposing || programmaticUpdating) return;
+        if (!canAutoSubmitCurrentValue()) return;
+        addLog(`auto submit: ${reason}`);
+        handleScan();
+      }, AUTO_SUBMIT_DELAY_MS);
+    }
+
+    function resetAll() {
+      clearAutoSubmitTimer();
+
+      stage = 1;
+      firstData = {
+        raw: '',
+        code: '',
+        qty: '',
+        masterDisplay: '',
+        confidence: '',
+        mode: '',
+        sourceCode: ''
+      };
+      isHandling = false;
+
+      setInputValueSafely('');
+      firstRawView.textContent = '—';
+      firstParsedView.textContent = '—';
+      secondCodeView.textContent = '—';
+
+      setCardState(
+        'state-blue',
+        '1回目待受',
+        '現品票を読み込んでください',
+        '1回目待機中です'
+      );
+
+      addLog('reset complete');
+      updateValidationNote();
+      focusInput();
+    }
+
+    async function acceptFirstScan() {
+      clearAutoSubmitTimer();
+      applyInputSanitize(false);
+
+      const raw = scanInput.value;
+      const parsed = parseFirstLabel(raw);
+
+      firstRawView.textContent = normalizeText(raw) || '—';
+
+      if (!parsed.ok) {
+        firstParsedView.textContent = 'マスタ確定失敗';
+        secondCodeView.textContent = '—';
+
+        setCardState(
+          'state-red',
+          '1回目エラー',
+          '1回目 読取エラー',
+          '現品票データをマスタ品番に確定できませんでした。再読込してください'
+        );
+
+        addLog('1回目確定失敗: ' + normalizeText(raw));
+        incrementCount('error');
+        signalError();
+        focusInput(true);
+        updateValidationNote();
+        return;
+      }
+
+      firstData = {
+        raw: parsed.raw,
+        code: parsed.code,
+        qty: parsed.qty,
+        masterDisplay: parsed.masterDisplay,
+        confidence: parsed.confidence,
+        mode: parsed.mode,
+        sourceCode: parsed.sourceCode
+      };
+
+      firstParsedView.textContent =
+        `確定品番: ${parsed.masterDisplay} / 内部値: ${parsed.code} / 数量: ${parsed.qty} / 照合: ${parsed.confidence}` +
+        (parsed.sourceCode && parsed.sourceCode !== parsed.code ? ` / 読取値: ${parsed.sourceCode}` : '');
+
+      stage = 2;
+
+      setCardState(
+        'state-blue',
+        '2回目待受',
+        '1回目 読取OK',
+        `確定品番：${parsed.masterDisplay} / 数量：${parsed.qty} / 2回目で品番ラベルを読んでください`
+      );
+
+      addLog(`1回目確定: master=${parsed.masterDisplay} / code=${parsed.code} / qty=${parsed.qty} / confidence=${parsed.confidence}` +
+        (parsed.sourceCode && parsed.sourceCode !== parsed.code ? ` / source=${parsed.sourceCode}` : ''));
+
+      setInputValueSafely('');
+      signalInfo();
+      focusInput();
+    }
+
+    async function judgeSecondScan() {
+      clearAutoSubmitTimer();
+      applyInputSanitize(false);
+
+      const raw = scanInput.value;
+      const parsed = parseSecondLabel(raw);
+
+      secondCodeView.textContent = normalizeCode(raw) || '—';
+
+      if (!parsed.ok) {
+        setCardState(
+          'state-red',
+          '2回目エラー',
+          '2回目 読取エラー',
+          '品番ラベルは10〜12桁の英数字です'
+        );
+
+        addLog('2回目形式エラー: ' + normalizeText(raw));
+        incrementCount('error');
+        signalError();
+        focusInput(true);
+        updateValidationNote();
+        return;
+      }
+
+      const payloadBase = {
+        scanned_at: new Date().toISOString(),
+        first_raw: firstData.raw,
+        first_code: firstData.code,
+        first_qty: firstData.qty,
+        first_master_display: firstData.masterDisplay,
+        first_confidence: firstData.confidence,
+        first_source_code: firstData.sourceCode,
+        second_code: parsed.code
+      };
+
+      if (parsed.code === firstData.code) {
+        setCardState(
+          'state-green',
+          '一致',
+          '正解',
+          `一致：${firstData.masterDisplay} / 数量：${firstData.qty}`
+        );
+
+        addLog(`突合結果: 正解 / 1回目=${firstData.masterDisplay} / 2回目=${parsed.code} / 数量=${firstData.qty}`);
+        incrementCount('match');
+        signalOk();
+
+        await postToSupabase({
+          ...payloadBase,
+          result: 'match'
+        });
+      } else {
+        setCardState(
+          'state-red',
+          '不一致',
+          '不一致',
+          `1回目：${firstData.masterDisplay} / 2回目：${parsed.code} / 数量：${firstData.qty}`
+        );
+
+        addLog(`突合結果: 不一致 / 1回目=${firstData.masterDisplay} / 2回目=${parsed.code} / 数量=${firstData.qty}`);
+        incrementCount('mismatch');
+        signalError();
+
+        await postToSupabase({
+          ...payloadBase,
+          result: 'mismatch'
+        });
+      }
+
+      stage = 3;
+      updateValidationNote();
+      try { scanInput.blur(); } catch (e) {}
+    }
+
+    async function handleScan() {
+      if (isHandling || isComposing || programmaticUpdating) return;
+      isHandling = true;
+
+      try {
+        applyInputSanitize(false);
+
+        if (stage === 1) {
+          await acceptFirstScan();
+        } else if (stage === 2) {
+          await judgeSecondScan();
+        } else {
+          addLog('判定後停止中: 最初に戻す を押してください');
+          setCardState(
+            'state-amber',
+            '停止中',
+            '判定後停止中',
+            '次の作業は「最初に戻す」を押してください'
+          );
+          signalInfo();
+          updateValidationNote();
+        }
+      } finally {
+        setTimeout(() => {
+          isHandling = false;
+        }, 100);
+      }
+    }
+
+    function isSubmitLikeKeyEvent(e) {
+      return (
+        e.key === 'Enter' ||
+        e.key === 'Tab' ||
+        e.key === 'NumpadEnter' ||
+        e.code === 'Enter' ||
+        e.code === 'NumpadEnter' ||
+        e.keyCode === 13 ||
+        e.which === 13
+      );
+    }
+
+    function onScannerValueChanged() {
+      if (isComposing || programmaticUpdating) return;
+      applyInputSanitize();
+      scheduleAutoSubmit('input idle');
+    }
+
+    scanInput.addEventListener('input', () => {
+      onScannerValueChanged();
+    });
+
+    scanInput.addEventListener('change', () => {
+      if (programmaticUpdating) return;
+      applyInputSanitize(false);
+      if (stage !== 3 && scanInput.value.trim()) {
+        scheduleAutoSubmit('change');
+      }
+    });
+
+    scanInput.addEventListener('paste', (e) => {
+      e.preventDefault();
+
+      const pasted = (e.clipboardData || window.clipboardData).getData('text');
+      const sanitized = sanitizeForInput(pasted);
+
+      const start = scanInput.selectionStart || 0;
+      const end = scanInput.selectionEnd || 0;
+      const current = scanInput.value;
+
+      programmaticUpdating = true;
+      scanInput.value = current.slice(0, start) + sanitized + current.slice(end);
+
+      const pos = start + sanitized.length;
+      try {
+        scanInput.setSelectionRange(pos, pos);
+      } catch (err) {}
+
+      setTimeout(() => {
+        programmaticUpdating = false;
+        applyInputSanitize(false);
+        scheduleAutoSubmit('paste');
+      }, 0);
+    });
+
+    scanInput.addEventListener('compositionstart', () => {
+      isComposing = true;
+      clearAutoSubmitTimer();
+    });
+
+    scanInput.addEventListener('compositionend', () => {
+      isComposing = false;
+      applyInputSanitize(false);
+      scheduleAutoSubmit('compositionend');
+    });
+
+    scanInput.addEventListener('keydown', (e) => {
+      if (isSubmitLikeKeyEvent(e)) {
+        e.preventDefault();
+        clearAutoSubmitTimer();
+        addLog(`submit key: key=${e.key || ''} code=${e.code || ''}`);
+        handleScan();
+      }
+    });
+
+    scanInput.addEventListener('focus', () => {
+      scanInput.setAttribute('autocorrect', 'off');
+      scanInput.setAttribute('autocapitalize', 'characters');
+      updateValidationNote();
+    });
+
+    btnFocus.addEventListener('click', () => {
+      ensureAudioUnlocked();
+
+      if (stage !== 3) {
+        focusInput();
+        addLog('input focused');
+      } else {
+        addLog('判定後停止中のため、最初に戻す待機');
+      }
+    });
+
+    btnReset.addEventListener('click', () => {
+      ensureAudioUnlocked();
+      resetAll();
+    });
+
+    btnClearCounts.addEventListener('click', () => {
+      ensureAudioUnlocked();
+      if (confirm('件数とログをクリアしますか？')) {
+        clearCountsAndLogs();
+        updateValidationNote();
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      const tag = e.target.tagName;
+      if (tag === 'INPUT' || tag === 'BUTTON' || tag === 'SUMMARY') return;
+      if (stage !== 3) {
+        focusInput();
+      }
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && stage !== 3) {
+        setTimeout(() => focusInput(), 150);
+      }
+    });
+
+    window.addEventListener('pageshow', () => {
+      if (stage !== 3) {
+        setTimeout(() => focusInput(), 150);
+      }
+    });
+
+    ['touchstart', 'pointerdown', 'mousedown'].forEach((eventName) => {
+      window.addEventListener(eventName, ensureAudioUnlocked, { passive: true, once: true });
+    });
+
+    loadState();
+    renderCounts();
+    renderLogs();
+    resetAll();
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', async () => {
+        try {
+          await navigator.serviceWorker.register('./service-worker.js');
+          console.log('Service Worker registered');
+        } catch (err) {
+          console.error('Service Worker registration failed:', err);
+          addLog('Service Worker registration failed');
+        }
+      });
+    }
+  </script>
+</body>
+</html>
